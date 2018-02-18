@@ -51,6 +51,7 @@ void bzero(void *, int);
 #include "rhost_utf8.h"
 #include "local.h"
 #include "door.h"
+#include "websock.h"
 
 #include "debug.h"
 #define FILENUM BSD_C
@@ -2074,6 +2075,7 @@ initializesock(int s, struct sockaddr_in * a, char *addr, int i_keyflag, int key
     d->player = 0;		/* be sure #0 isn't wizard.  Shouldn't be. */
     d->addr[0] = '\0';
     d->doing[0] = '\0';
+    d->checksum[0] = '\0';
     make_nonblocking(s);
     d->output_prefix = NULL;
     d->output_suffix = NULL;
@@ -2287,6 +2289,12 @@ process_input(DESC * d)
 	mudstate.debug_cmd = cmdsave;
 	RETURN(0); /* #16 */
     }
+
+    if (d->flags & DS_WEBSOCKETS) {
+        /* Process using WebSockets framing. */
+        got = in = process_websocket_frame(d, buf, got);
+    }
+
     if (!d->raw_input) {
 	d->raw_input = (CBLK *) alloc_lbuf("process_input.raw");
 	d->raw_input_at = d->raw_input->cmd;
@@ -2301,16 +2309,14 @@ process_input(DESC * d)
 //fprintf(stderr, "Test: %s\nVal: %d", buf, in_get);
     for (q = buf, qend = buf + got; q < qend; q++) {
 	if ( (*q == '\n') && (!(d->flags & DS_API) || (!in_get && ((q+10) > qend) && (d->flags & DS_API))) ) {
-	      *p = '\0';
-		if (p > d->raw_input->cmd) {
-			save_command(d, d->raw_input);
-			d->raw_input = (CBLK *) alloc_lbuf("process_input.raw");
-			p = d->raw_input_at = d->raw_input->cmd;
-			pend = d->raw_input->cmd + LBUF_SIZE -
-			sizeof(CBLKHDR) - 1;
-		} else {
-			in -= 1;	/* for newline */
-		}
+            *p = '\0';
+            save_command(d, d->raw_input);
+            d->raw_input = (CBLK *) alloc_lbuf("process_input.raw");
+            p = d->raw_input_at = d->raw_input->cmd;
+            pend = d->raw_input->cmd + LBUF_SIZE - sizeof(CBLKHDR) - 1;
+            if (!(p > d->raw_input->cmd)) {
+                in -= 1;	/* for newline */
+            }
 	} else if ((*q == '\b') || (*q == 127)) {
 	    if (*q == 127)
 		queue_string(d, "\b \b");

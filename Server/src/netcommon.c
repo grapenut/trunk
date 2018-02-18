@@ -36,6 +36,7 @@ char *index(const char *, int);
 #include "levels.h"
 #endif /* REALITY_LEVELS */
 #include "door.h"
+#include "websock.h"
 
 #include "debug.h"
 #define FILENUM NETCOMMON_C
@@ -1157,9 +1158,6 @@ update_quotas(struct timeval last, struct timeval current)
 
     DPUSH; /* #111 */
 
-    if ( mudconf.timeslice <= 0 ) {
-       mudconf.timeslice = 1;
-    }
     nslices = msec_diff(current, last) / mudconf.timeslice;
 
     if (nslices > 0) {
@@ -1757,7 +1755,13 @@ queue_write(DESC * d, const char *b, int n)
     if (n <= 0) {
 	VOIDRETURN; /* #117 */
     }
-
+    
+    /* Convert to a WebSockets frame before queuing output */
+    if (d->flags & DS_WEBSOCKETS) {
+        /* TODO: Uses a static buffer; probably safe in this case. */
+        to_websocket_frame(&b, &n, WEBSOCKET_CHANNEL_TEXT);
+    }
+    
     if (d->output_size + n > mudconf.output_limit)
 	process_output(d);
 
@@ -4842,6 +4846,21 @@ do_command(DESC * d, char *command)
 
     DPUSH; /* #147 */
 
+    if (d->flags & DS_WEBSOCKETS_REQUEST) {
+        //STARTLOG(LOG_ALWAYS, "WS", "AUTH")
+        //log_text((char *) "request > ");
+        //log_text(command);
+        //ENDLOG
+        /* Parse WebSockets upgrade request. */
+        if (!process_websocket_request(d, command)) {
+            STARTLOG(LOG_ALWAYS, "NET", "WS")
+            log_text((char *) "WebSockets handshake failed!");
+            ENDLOG
+            RETURN(0);
+        }
+        RETURN(0);
+    }
+
     time_str = NULL;
     chk_perm = store_perm = 0;
     cmdsave = mudstate.debug_cmd;
@@ -4894,6 +4913,18 @@ do_command(DESC * d, char *command)
 	    }
 	}
     }
+
+    if (!(d->flags & DS_CONNECTED)) {
+        if (is_websocket(command)) {
+            STARTLOG(LOG_ALWAYS, "NET", "WS")
+            log_text((char *) "WebSockets upgrade requested.");
+            ENDLOG
+            /* Continue processing as a WebSockets upgrade request. */
+            d->flags |= DS_WEBSOCKETS_REQUEST;
+            RETURN(0);
+        }
+    }
+
     /* Split off the command from the arguments */
 
     arg = command;
@@ -4994,6 +5025,7 @@ do_command(DESC * d, char *command)
                mudstate.curr_cmd = (char *) "";
 	       if (d->output_suffix) {
 		   queue_string(d, d->output_suffix);
+	
 		   queue_write(d, "\r\n", 2);
 	       }
 	       mudstate.debug_cmd = cmdsave;
@@ -5100,7 +5132,7 @@ do_command(DESC * d, char *command)
             }
             break;
         case CMD_GET:
-            if ( !(d->flags & DS_API) || (d->flags & DS_CONNECTED) ) {
+            if ( !(d->flags & DS_API || d->flags) || (d->flags & DS_CONNECTED) ) {
                if ( d->flags & DS_CONNECTED ) {
                   notify_quiet(d->player, "Permission denied.");
                } else {
@@ -5109,6 +5141,7 @@ do_command(DESC * d, char *command)
                }
                break;
             }
+
             s_dtime = (char *) ctime(&mudstate.now);
 #ifndef HAS_OPENSSL
             queue_string(d, "HTTP/1.1 200 OK\r\n");

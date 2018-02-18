@@ -94,6 +94,8 @@ struct descriptor_data_online {
   dbref player;
 };
 
+#define WEBSOCKETS_CHECKSUM_LEN 40
+
 typedef struct descriptor_data DESC;
 struct descriptor_data {
   int descriptor;
@@ -144,6 +146,8 @@ struct descriptor_data {
   char *door_lbuf;
   char *door_mbuf;
   char *door_raw;
+  char checksum[WEBSOCKETS_CHECKSUM_LEN + 1];
+  uint64_t ws_frame_len;
 };
 
 /* flags in the flag field */
@@ -157,6 +161,8 @@ struct descriptor_data {
 #define DS_HAVEpFX		0x0080		/* Target has prefix */
 #define DS_HAVEsFX		0x0100		/* Target has suffix */
 #define DS_API			0x0200		/* Target is an API handler */
+#define DS_WEBSOCKETS_REQUEST	0x0400		/* Target is negotiating websockets */
+#define DS_WEBSOCKETS		0x0800		/* Target is a websocket */
 
 extern DESC *descriptor_list;
 extern DESC *desc_in_use;
