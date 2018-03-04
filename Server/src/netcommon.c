@@ -5132,7 +5132,7 @@ do_command(DESC * d, char *command)
             }
             break;
         case CMD_GET:
-            if ( !(d->flags & DS_API || d->flags) || (d->flags & DS_CONNECTED) ) {
+            if ( !(d->flags & DS_API) || (d->flags & DS_CONNECTED) ) {
                if ( d->flags & DS_CONNECTED ) {
                   notify_quiet(d->player, "Permission denied.");
                } else {
