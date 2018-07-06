@@ -95,7 +95,6 @@ LIBS = $(CUSTLIBS)
 LIBOBJS = 
 # for compiling on lowmem systems use this
 #CFLAGS = --param ggc-min-expand=0 --param ggc-min-heapsize=8192
-CFLAGS = -funsigned-char
 
 # If you wish to debug the code, run under this
 OPTIM = -g
