@@ -4656,7 +4656,7 @@ FUNCTION(fun_art)
 
 FUNCTION(fun_textfile)
 {
-   int t_val, i_check;
+   int t_val, i_check, i_suggest;
    dbref it;
    char *t_buff, *t_bufptr, *tmp_buff;
    CMDENT *cmdp;
@@ -4675,11 +4675,11 @@ FUNCTION(fun_textfile)
       return;
    }
 
-   if (!fn_range_check("TEXTFILE", nfargs, 2, 5, buff, bufcx))
+   if (!fn_range_check("TEXTFILE", nfargs, 2, 6, buff, bufcx))
        return;
 
    it = player;
-   t_val = 0;
+   t_val = i_suggest = 0;
    if ( nfargs > 2 && *fargs[2] ) {
       t_val = atoi(fargs[2]);
       t_val = (((t_val < 0) || (t_val > 2)) ? 0 : t_val);
@@ -4697,6 +4697,12 @@ FUNCTION(fun_textfile)
    } else {
       strcpy(tmp_buff, (char *)"  ");
    }
+   if ( (nfargs > 5) && *fargs[5] ) {
+      i_suggest = atoi(fargs[5]);
+      if ( i_suggest ) {
+         t_val |= DYN_SUGGEST;
+      }
+   }
    parse_dynhelp(it, cause, t_val, fargs[0], fargs[1], t_buff, t_bufptr, 1, i_check, tmp_buff);
 
    free_lbuf(tmp_buff);
@@ -4707,7 +4713,7 @@ FUNCTION(fun_textfile)
 FUNCTION(fun_dynhelp)
 {
    char *tpr_buff, *tprp_buff;
-   int retval, t_val;
+   int retval, t_val, i_suggest;
    dbref it;
    CMDENT *cmdp;
 
@@ -4725,7 +4731,7 @@ FUNCTION(fun_dynhelp)
       return;
    }
 
-   if (!fn_range_check("DYNHELP", nfargs, 2, 4, buff, bufcx))
+   if (!fn_range_check("DYNHELP", nfargs, 2, 5, buff, bufcx))
        return;
 
    if ( nfargs < 3 || !*fargs[2] ) {
@@ -4739,10 +4745,16 @@ FUNCTION(fun_dynhelp)
          return;
       }
    }
-   t_val = 0;
-   if ( nfargs > 3 && *fargs[3] ) {
+   t_val = i_suggest = 0;
+   if ( (nfargs > 3) && *fargs[3] ) {
       t_val = atoi(fargs[3]);
       t_val = (((t_val < 0) || (t_val > 2)) ? 0 : t_val);
+   }
+   if ( (nfargs > 4) && *fargs[4] ) {
+      i_suggest = atoi(fargs[4]);
+      if ( i_suggest ) {
+         t_val |= DYN_SUGGEST;
+      }
    }
 
    retval = parse_dynhelp(it, cause, t_val, fargs[0], fargs[1], (char *)NULL, (char *)NULL, 0, 0, (char *)NULL);
@@ -12360,6 +12372,9 @@ FUNCTION(fun_listprotection)
    }
    if ( (nfargs > 1) && *fargs[1] ) {
       i_key = atoi(fargs[1]);
+      if ( (i_key < 0) || (i_key > 4) ) {
+         i_key = 0;
+      }
    } else { 
       i_key = 0;
    }
@@ -12372,8 +12387,7 @@ FUNCTION(fun_listprotection)
    tstr = alloc_lbuf("listprotection_1");
    tstr2 = alloc_lbuf("listprotection_2");
    if (H_Protect(thing)) {
-      (void) atr_get_str(tstr, thing, A_PROTECTNAME,
-                         &aowner, &aflags);
+      (void) atr_get_str(tstr, thing, A_PROTECTNAME, &aowner, &aflags);
       if ( *tstr ) {
          strcpy(tstr2, tstr);
          s_strtok = strtok_r(tstr2, "\t", &s_strtokr);
@@ -12382,7 +12396,7 @@ FUNCTION(fun_listprotection)
             if ( s_matchstr ) {
                *s_matchstr = '\0';
                i_matchint = atoi(s_matchstr+1);
-               if ( (!i_key || (i_key == 1)) && (i_matchint == 1) ) {
+               if ( (!i_key || (i_key == 1) || (i_key == 3)) && (i_matchint == 1) ) {
                   if ( i_first )
                      safe_chr(c_buf, buff, bufcx);
                   safe_str(s_strtok, buff, bufcx);
@@ -12402,6 +12416,16 @@ FUNCTION(fun_listprotection)
             s_strtok = strtok_r(NULL, "\t", &s_strtokr);
          }
       }
+   }
+   if ( (i_key == 3) || (i_key == 4) ) {
+      s_strtok = atr_get(thing, A_ALIAS, &aowner, &aflags);
+      if ( *s_strtok ) {
+         if ( i_first ) {
+            safe_chr(c_buf, buff, bufcx);
+         }
+         safe_str(s_strtok, buff, bufcx);
+      }
+      free_lbuf(s_strtok);
    }
    free_lbuf(tstr);
    free_lbuf(tstr2);
@@ -18523,12 +18547,15 @@ FUNCTION(fun_streq)
 
 FUNCTION(fun_randextract)
 {
-  int *used, nword, numext, got, pos, x, y, z, end;
-  char *p1, *p2, sep, te, *b2, osep;
+  int *used, nword, numext, got, pos, x, y, z, end, i_sum, i_max, i_loop,
+      ilist[LBUF_SIZE / 2], ilist2[LBUF_SIZE / 2], i_slist, i_nlist, i_weight, i_usable;
+  char *p1, *p2, sep, te, *b2, osep, *tbuff, *tbuff2, *tbuffptr, 
+       *slist[LBUF_SIZE / 2], *nlist[LBUF_SIZE / 2], *s_use;
 
-  if (!fn_range_check("RANDEXTRACT", nfargs, 1, 5, buff, bufcx)) {
+  if (!fn_range_check("RANDEXTRACT", nfargs, 1, 6, buff, bufcx)) {
     return;
   }
+  i_weight = 0;
   if (nfargs > 3)
     te = toupper(*fargs[3]);
   else
@@ -18543,11 +18570,54 @@ FUNCTION(fun_randextract)
 
   if ((!*fargs[0]) || (numext < 1) || (numext > LBUF_SIZE) || ((te != 'L') && (te != 'R') && (te != 'D')))
     return;
+
   if ((nfargs > 2) && (*fargs[2])) {
     sep = *fargs[2];
   } else {
     sep = ' ';
   }
+
+  i_usable = i_max = i_sum = 0;
+  s_use = fargs[0];
+  if ( (nfargs > 5) && *fargs[5] ) {
+     i_weight = 1;
+     tbuff = alloc_lbuf("fun_randextract_weighted");
+     tbuff2 = alloc_lbuf("fun_randextract_weighted2");
+     strcpy(tbuff2, fargs[0]);
+     strcpy(tbuff, fargs[5]);
+     i_slist = list2arr(slist, LBUF_SIZE / 2, tbuff2, sep);
+     i_nlist = list2arr(nlist, LBUF_SIZE / 2, tbuff, sep);
+     for ( i_loop = 0; i_loop < i_slist; i_loop++) {
+        if ( i_loop < i_nlist ) {
+           ilist[i_loop] = atoi(nlist[i_loop]);
+           if ( ilist[i_loop] > 100 ) {
+              ilist[i_loop] = 100;
+           }
+           if ( ilist[i_loop] < 0 ) {
+              ilist[i_loop] = 0;
+           }
+           if ( i_max < ilist[i_loop] ) {
+              i_max = ilist[i_loop];
+           }
+        } else {
+           ilist[i_loop] = 0;
+        }
+     } 
+     if ( i_max > 0 ) {
+        i_sum = random() % i_max;
+     }
+     memset(tbuff, '\0', LBUF_SIZE);
+     tbuffptr = tbuff;
+     for ( i_loop = 0; i_loop < i_slist; i_loop++ ) {
+        if ( ilist[i_loop] >= i_sum ) {
+           ilist2[i_usable] = i_loop;
+           i_usable++;
+        }
+     }
+     free_lbuf(tbuff2);
+     free_lbuf(tbuff);
+  }
+
   if (nfargs > 4 && (*fargs[4])) {
     if ( mudconf.delim_null && (strcmp(fargs[4], (char *)"@@") == 0) ) {
        osep = '\0';
@@ -18558,7 +18628,7 @@ FUNCTION(fun_randextract)
     osep = sep;
   }
   nword = 0;
-  p1 = fargs[0];
+  p1 = s_use;
   while (*p1 && (*p1 == sep))
     p1++;
   while (*p1) {     /* count number of words */
@@ -18578,8 +18648,12 @@ FUNCTION(fun_randextract)
   used = NULL;
   switch (te) {
     case 'L':
-      pos = random() % nword;
-      p1 = fargs[0];
+      if ( i_weight ) {
+         pos = ilist2[random() % i_usable];
+      } else {
+         pos = random() % nword;
+      }
+      p1 = s_use;
       while (*p1 == sep)
          p1++;
       for (x = 0; x < pos; x++) { /* find start of extract */
@@ -18601,7 +18675,9 @@ FUNCTION(fun_randextract)
            end = 1;
          if (got && osep)
            safe_chr(osep,buff,bufcx);
-         safe_str(p1, buff, bufcx);
+         if ( *p1 ) {
+            safe_str(p1, buff, bufcx);
+         }
          got = 1;
          if (end)
            break;
@@ -18619,7 +18695,21 @@ FUNCTION(fun_randextract)
       for (x = 0; x < nword; x++)
          *(used + x) = x;
       for (x = nword; x > 1; x--) {
-         y = random() % x;
+         if ( i_weight ) {
+            y = ilist2[random() % i_usable];
+            if ( i_max > 0 ) {
+               i_sum = random() % i_max;
+               i_usable=0;
+               for ( i_loop = 0; i_loop < i_slist; i_loop++ ) {
+                  if ( ilist[i_loop] >= i_sum ) {
+                     ilist2[i_usable] = i_loop;
+                     i_usable++;
+                  }
+               }
+            }
+         } else {
+            y = random() % x;
+         }
          if (y < (x - 1)) {
            z = *(used + y);
            *(used + y) = *(used + x - 1);
@@ -18633,9 +18723,24 @@ FUNCTION(fun_randextract)
       for (x = 0; x < numext; x++) {
          if (te == 'R')
            pos = *(used+x);
-         else
-           pos = random() % nword;
-         p1 = fargs[0];
+         else {
+           if ( i_weight ) {
+              pos = ilist2[random() % i_usable];
+              if ( i_max > 0 ) {
+                 i_sum = random() % i_max;
+                 i_usable=0;
+                 for ( i_loop = 0; i_loop < i_slist; i_loop++ ) {
+                    if ( ilist[i_loop] >= i_sum ) {
+                       ilist2[i_usable] = i_loop;
+                       i_usable++;
+                    }
+                 }
+              }
+           } else {
+              pos = random() % nword;
+           }
+         }
+         p1 = s_use;
          while (*p1 == sep)
            p1++;
          for (y = 0; y < pos; y++) { /* find start of word */
@@ -18656,23 +18761,26 @@ FUNCTION(fun_randextract)
          *(b2 + z) = '\0';
          if (got && osep)
            safe_chr(osep,buff,bufcx);
-         safe_str(b2, buff, bufcx);
+         if ( *p1 && *b2 ) {
+            safe_str(b2, buff, bufcx);
+         }
          got = 1;
       }
       free_lbuf(b2);
       break;
   }
-  if (used)
+  if (used) {
     free(used);
+  }
 }
 
 FUNCTION(fun_extractword)
 {
-   int start, len, i_cntr, i_cntr2, first, i_del, i_numwords;
+   int start, len, i_cntr, i_cntr2, first, i_del, i_numwords, i_mod, i_words;
    char *sep, *osep, *pos, *prevpos, *fargbuff, *outbuff;
    ANSISPLIT outsplit[LBUF_SIZE], *optr, *prevoptr;
 
-   if (!fn_range_check("EXTRACTWORD", nfargs, 1, 6, buff, bufcx)) {
+   if (!fn_range_check("EXTRACTWORD", nfargs, 1, 7, buff, bufcx)) {
       return;
    }
 
@@ -18716,6 +18824,29 @@ FUNCTION(fun_extractword)
       i_del = atoi(fargs[5]);
    } else {
       i_del = 0;
+   }
+
+   if ( (nfargs > 6) && *fargs[6] ) {
+      i_mod = atoi(fargs[6]);
+   } else {
+      i_mod = 0;
+   }
+
+   if ( i_mod ) {
+      pos = fargbuff;
+      i_words = 0;
+      while ( pos && *pos ) {
+         i_words++;
+         prevpos = strstr(pos, sep);
+         if ( !prevpos || !*prevpos )
+            break;
+         pos = prevpos + strlen(sep);
+      }
+      if ( (i_words > 0) && start ) {
+         start = (start % i_words);
+         if ( !start )
+            start = i_words;
+      }
    }
 
    if( (len < 0) || (start < 0) ) {
@@ -19078,8 +19209,10 @@ FUNCTION(fun_objid) {
          }
       }
       if ( i_id_found == 2 ) {
+         atext = alloc_mbuf("objid_mbuffer");
          sprintf(atext, "#%d:%.0f", it, d_objid);
          safe_str(atext, buff, bufcx);
+         free_mbuf(atext);
          return;
       } else {
          atext = atr_get(it, A_CREATED_TIME, &aowner, &aflags);
@@ -21261,6 +21394,7 @@ FUNCTION(fun_lcon)
         (Has_contents(it)) &&
         (Examinable(player, it) ||
          (Location(player) == it) ||
+         (isExit(player) && (where_is(player) == it)) ||
          (it == cause))) {
 
         tbuf = alloc_sbuf("fun_lcon");
@@ -21511,7 +21645,7 @@ FUNCTION(fun_lexits)
        return;
     }
     exam = Examinable(player, it);
-    if (!exam && (where_is(player) != it) && (it != cause)) {
+    if (!exam && (where_is(player) != it) && (it != cause) && (isExit(player) && (Location(player) != it)) ) {
        safe_str("#-1", buff, bufcx);
        return;
     }
@@ -28214,11 +28348,28 @@ FUNCTION(fun_locate)
 FUNCTION(fun_squish)
 {
    char *t_ptr, sep;
+   int i_count, i;
 
    if (nfargs == 0) {
       return;
    }
-   varargs_preamble("SQUISH", 2);
+   if (!fn_range_check("SQUISH", nfargs, 1, 3, buff, bufcx)) {
+       return;
+   }
+   sep = ' ';
+   if ( (nfargs > 1) && *fargs[1] ) {
+      sep = *fargs[1];
+   }
+   i_count = 1;
+   if ( (nfargs > 2) && *fargs[2] ) {
+      i_count = atoi(fargs[2]);
+      if ( i_count > LBUF_SIZE/2 ) {
+         i_count = LBUF_SIZE/2;
+      }
+      if ( i_count < 1 ) {
+         i_count = 1; 
+      }
+   }
    t_ptr = fargs[0];
    while ( *t_ptr ) {
       while ( *t_ptr && (*t_ptr != sep) ) {
@@ -28228,10 +28379,16 @@ FUNCTION(fun_squish)
       if ( !*t_ptr ) {
          return;
       }
-      safe_chr(*t_ptr, buff, bufcx);
+      for (i = 0; i < i_count; i++ ) {
+         safe_chr(*t_ptr, buff, bufcx);
+      }
+      if ( strlen(buff) > (LBUF_SIZE - 40) ) {
+        return;
+      }
       t_ptr++;
-      while ( *t_ptr && (*t_ptr == sep) )
+      while ( *t_ptr && (*t_ptr == sep) ) {
          t_ptr++;
+      }
    }
 }
 

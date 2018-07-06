@@ -332,14 +332,18 @@ NDECL(cf_init)
     mudconf.crypt_rounds = 5000;	/* Number of crypt rounds for passwords */
     mudconf.null_is_idle = 0;		/* Treat @@ as idle for idle timer */
     mudconf.iter_loop_max = 100000;	/* Maximum loops for infinite loop iter */
+    mudconf.vlimit = 400;		/* Runtime vlimit here */
     memset(mudconf.sub_include, '\0', sizeof(mudconf.sub_include));
     memset(mudconf.cap_conjunctions, '\0', sizeof(mudconf.cap_conjunctions));
     memset(mudconf.cap_articles, '\0', sizeof(mudconf.cap_articles));
     memset(mudconf.cap_preposition, '\0', sizeof(mudconf.cap_preposition));
     memset(mudconf.atrperms, '\0', sizeof(mudconf.atrperms));
     memset(mudconf.tor_localhost, '\0', sizeof(mudconf.tor_localhost));
-    memset(mudstate.tor_localcache, '\0', sizeof(mudstate.tor_localcache));
+    memset(mudconf.tree_character, '\0', sizeof(mudconf.tree_character));
+    memset(mudconf.exit_separator, '\0', sizeof(mudconf.exit_separator));
+    memset(mudconf.help_separator, '\0', sizeof(mudconf.help_separator));
     strcpy(mudconf.tree_character, (char *)"`");
+    memset(mudstate.tor_localcache, '\0', sizeof(mudstate.tor_localcache));
 #ifdef MYSQL_VERSION
     strcpy(mudconf.mysql_host, (char *)"localhost");
     strcpy(mudconf.mysql_user, (char *)"dbuser");
@@ -538,7 +542,6 @@ NDECL(cf_init)
     mudconf.robot_toggles.word6 = 0;
     mudconf.robot_toggles.word7 = 0;
     mudconf.robot_toggles.word8 = 0;
-    mudconf.vlimit = 400;
     mudconf.vattr_flags = AF_ODARK;
     mudconf.abort_on_bug = 0;
     mudconf.rwho_transmit = 0;
@@ -837,7 +840,7 @@ NDECL(cf_init)
     mudconf.ntfy_nest_lim = 20;
     mudconf.cache_trim = 0;
     mudconf.cache_steal_dirty = 1;
-    mudconf.vlimit = 750;
+    mudconf.vlimit = 100000; /* we need this to be very large for db conversions */
     mudconf.safer_passwords = 0; /* If enabled, requires tougher to guess passwords */
     mudconf.vattr_limit_checkwiz = 0; /* Check if wizards check vattr limits */
     mudstate.logging = 0;
@@ -2648,22 +2651,27 @@ CF_HAND(cf_atrperms)
 CF_HAND(cf_string_chr)
 {
     int retval;
+    long l_diff;
     char *buff;
 
     /* Copy the string to the buffer if it is not too big */
 
     retval = 0;
-    if (strlen(str) >= extra) {
+    l_diff = strlen(str);
+    if (l_diff >= extra) {
 	str[extra - 1] = '\0';
 	if (mudstate.initializing) {
 	    STARTLOG(LOG_STARTUP, "CNF", "NFND")
 		buff = alloc_lbuf("cf_string.LOG");
-	    sprintf(buff, "%.3900s: String truncated", cmd);
-	    log_text(buff);
-	    free_lbuf(buff);
+	        sprintf(buff, "%.3900s: String truncated", cmd);
+	        log_text(buff);
+	        free_lbuf(buff);
 	    ENDLOG
 	} else {
-	    notify(player, "String truncated");
+	    buff = alloc_lbuf("cf_string.LOG");
+            sprintf(buff, "String truncated [%ld over max of %ld characters]", l_diff - extra, extra);
+	    notify(player, buff);
+            free_lbuf(buff);
 	}
 	retval = 1;
     }
@@ -2678,22 +2686,27 @@ CF_HAND(cf_string_chr)
 CF_HAND(cf_string)
 {
     int retval;
+    long l_diff;
     char *buff;
 
     /* Copy the string to the buffer if it is not too big */
 
     retval = 0;
-    if (strlen(str) >= extra) {
+    l_diff = strlen(str);
+    if (l_diff >= extra) {
 	str[extra - 1] = '\0';
 	if (mudstate.initializing) {
 	    STARTLOG(LOG_STARTUP, "CNF", "NFND")
 		buff = alloc_lbuf("cf_string.LOG");
-	    sprintf(buff, "%.3900s: String truncated", cmd);
-	    log_text(buff);
-	    free_lbuf(buff);
+	        sprintf(buff, "%.3900s: String truncated", cmd);
+	        log_text(buff);
+	        free_lbuf(buff);
 	    ENDLOG
 	} else {
-	    notify(player, "String truncated");
+	    buff = alloc_lbuf("cf_string.LOG");
+            sprintf(buff, "String truncated [%ld over max of %ld characters]", l_diff - extra, extra);
+	    notify(player, buff);
+            free_lbuf(buff);
 	}
 	retval = 1;
     }
@@ -2704,22 +2717,27 @@ CF_HAND(cf_string)
 CF_HAND(cf_string_sub)
 {
     int retval;
+    long l_diff;
     char *buff, *s_sublist="abcdfiklnopqrstvwx#!@0123456789+?<-:", *ptr;
 
     /* Copy the string to the buffer if it is not too big */
 
     retval = 0;
-    if (strlen(str) >= extra) {
+    l_diff = strlen(str);
+    if (l_diff >= extra) {
 	str[extra - 1] = '\0';
 	if (mudstate.initializing) {
 	    STARTLOG(LOG_STARTUP, "CNF", "NFND")
 		buff = alloc_lbuf("cf_string.LOG");
-	    sprintf(buff, "%.3900s: String truncated", cmd);
-	    log_text(buff);
-	    free_lbuf(buff);
+	        sprintf(buff, "%.3900s: String truncated", cmd);
+	        log_text(buff);
+	        free_lbuf(buff);
 	    ENDLOG
 	} else {
-	    notify(player, "String truncated");
+	    buff = alloc_lbuf("cf_string.LOG");
+            sprintf(buff, "String truncated [%ld over max of %ld characters]", l_diff - extra, extra);
+	    notify(player, buff);
+            free_lbuf(buff);
 	}
 	retval = 1;
     }
@@ -3621,6 +3639,9 @@ CONF conftable[] =
      {(char *) "exits_connect_rooms",
      cf_bool, CA_GOD | CA_IMMORTAL, &mudconf.exits_conn_rooms, 0, 0, CA_WIZARD,
      (char *) "Is a room with an exit considered floating?"},
+    {(char *) "exit_separator",
+     cf_string, CA_GOD | CA_IMMORTAL, (int *) mudconf.exit_separator, 31, 0, CA_WIZARD,
+     (char *) "Specify the characters for default exit separation." },
     {(char *) "cache_depth",
      cf_int, CA_DISABLED, &mudconf.cache_depth, 0, 0, CA_WIZARD,
      (char *) "Show what the current cache debth is.\r\n"\
@@ -4152,6 +4173,9 @@ CONF conftable[] =
     {(char *) "help_index",
      cf_string, CA_DISABLED, (int *) mudconf.help_indx, 32, 0, CA_WIZARD,
      (char *) "Index used for help."},
+    {(char *) "help_separator",
+     cf_string, CA_GOD | CA_IMMORTAL, (int *) mudconf.help_separator, 31, 0, CA_WIZARD,
+     (char *) "Specify the characters for default help separation." },
     {(char *) "hide_nospoof",
      cf_bool, CA_GOD | CA_IMMORTAL, &mudconf.hide_nospoof, 0, 0, CA_WIZARD,
      (char *) "Is the NOSPOOF flag hidden from others?"},

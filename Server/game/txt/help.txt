@@ -779,27 +779,6 @@
   
   See Also: @cluster, cluster functions
   
-& SETQ_TEMPLATES
-  You can specify 'templates' for setq registers to automatically have 
-  pre-defined labels for each individual object.  This is done by setting
-  a string in the attribute 'SETQ_TEMPLATE' on the object.  The attribute
-  should be in the format:  <register>:<string>
-  
-  So an example would be:   0:foobar 1:xyzzy q:myqreg
-  
-  This would set a template on an object where it would preassign the
-  label 'foobar' to register 0, 'xyzzy' to register 1, and 'myqreg' to
-  register q.
-  
-  Note:  These are only useful for the immediate calling $commands.
-  They are not transversed through u() functions, @triggers, or other
-  action based events.
-  
-  You may redefine these labels as you would normally with nameq(), 
-  setq(), or setr().
-  
-  See Also: nameq(), setq(), setr()
-  
 & #LAMBDA
   Object type: #lambda
   
@@ -4271,6 +4250,7 @@
   Displays the current message-of-the-day.  Note that it is displayed when
   you connect to your character.
   
+& locks
 & @lock
   Command: @lock[/<whichlock>] <object>=<key>
            @lock <object>/<attrib>
@@ -12516,15 +12496,25 @@
   
 & pickrand()
 & randextract()
-  Function: randextract(<string>[, <numwords>, <delim>, <type>, <output sep>])
+  Function: randextract(<str>[, <numwords>, <delim>, <type>, <osep>, <weight>])
   
   The randextract() function is unique but somewhat similar to extract(). 
   The randextract() function takes <numwords> number of words from the string
-  <string> and returns those words in random order.  You may specify an 
+  <str> and returns those words in random order.  You may specify an 
   optional delimiter <delim> other than a space (the default).  You may also 
   specify what <type> of randextract() you wish to perform.  The following 
-  types exist.  You may specify an optional output separator else it uses
-  the same character as the delimiter.
+  types exist.  You may specify an optional output separator <osep> else it 
+  uses the same character as the delimiter.  You may apply a <weight> to each
+  word (using the same separator) that is a 1 to 1 order to the words in
+  <str>.  Any weights not applied to a word is assigned a normal weight of
+  '0'.  Each weight is a fuzzy multiplier of how often a word will be allowed 
+  to be picked with randextract.  It does this by applying a filter of weights
+  PRIOR to extracting the list.  Weight values start at '0' and max at '100'.
+  A weight of 100 you can be fairly assured will always appear.  Two weights
+  of 100 will have a 50/50 chance of appearing while the remaining would
+  have a rough estimate of a 1/100 chance of appearing.
+  
+  Valid types are:
       L - Grab given number of words lineally from the first random selection
       R - Grab <numwords> number of words but do not duplicate matches
       D - Grab <numwords> number of words and allow duplicate matches
@@ -12540,6 +12530,10 @@
     You say "this test a"
     > say randextract(this is a test,3,,D)
     You say "this a this"
+    > say randextract(this is a test,3,,D,,0 3 0)
+    You say "is this is is this test is this is is" (is has a 3x more chance)
+    > say randextract(this is a test,10,,D,,0 3 0)
+    You say "is is is this is is this is is is" (is has a 10x more chance)
   
   See Also: randpos(), randmatch(), extract(), extractword(), index(), rand()
   
@@ -13698,25 +13692,32 @@
   See Also: @cluster 
 
 & SQUISH()
-  Function squish(<string>[,<delimeter>])
+  Function squish(<string>[,<delimeter> [,<count>])
   
   This function will remove multiple spaces (or specified delimiter) from
   the string.  This is meant for the ability to remove excess spaces from
-  strings.
+  strings.  The delimeter defaults to a space.
+  
+  You may specify a <count> of how many repeated characters will be 
+  inserted between the values in the string.  The count defaults to 1.
   
   Examples:
     > @wait 0=@va me=Test[space(20)]Test
     Set.
-    > say v(va)
+    > say u(va)
     You say "Test                    Test"
-    > say squish(v(va))
+    > say squish(u(va))
     You say "Test Test"
+    > say squish(u(va),,5)
+    You say "Test     Test"
     > @vb me=TestaaaaaaaaaaaaaaaaaTest
     Set.
-    > say v(vb)
+    > say u(vb)
     You say "TestaaaaaaaaaaaaaaaaaTest"
-    > say squish(v(vb),a)
+    > say squish(u(vb),a)
     You say "TestaTest"
+    > say squish(u(vb),a,5)
+    You say "TestaaaaaTest"
   
   See Also: s(), strip(), creplace(), trim()
   
@@ -14978,9 +14979,12 @@
     0 - list all protected names of the target player (default)
     1 - list only the protected names that are marked as aliases.
     2 - list only the protected names that are not marked as aliases.
+    3 - list protect names that are marked as aliases and the @alias.
+    4 - list only the @alias
   
   If the player is invalid, it returns an error, otherwise it returns an
-  empty string if nothing is found for that criteria.
+  empty string if nothing is found for that criteria.  If the key is outside
+  of the range, it uses the default.
   
   The default deliminator is a colon (:).
   
@@ -15086,28 +15090,36 @@
    >say squish([space(10)]hi![space(10)]Bye![space(10)])
     You say "hi! Bye!"
   
-  See Also: s()
+  See Also: s(), trim(), edit(), tr()
   
 & S()
   Function: s(string)
  
-  This function performs pronoun substitution in a string, and then returns
-  that string.  As usually, %n is the name, %s the subjective pronoun, %o the
-  objective, %p the possessive, and %a the absolute possessive.  It is
-  important to note that the pronoun is that of the triggering object.
+  This function works like eval() in that it evaluates the string doing full 
+  pronoun substitution and function evaluation and then returns that string.  
+  As usually, %n is the name, %s the subjective pronoun, %o the objective, 
+  %p the possessive, and %a the absolute possessive.  It is important to 
+  note that the pronoun is that of the triggering object.
  
   So, if the ve of an object were: "[s(This is %n)], and I were to 
   type @trigger <object>/ve, it would return "This is <myname>", but 
   if vf were @trigger me/ve, then triggering the vf makes the ve 
   return "This is <object>"
   
+  As stated, this will also evaluate functions as well.  If you wish to
+  only evaluate substitutions, please refer to the subeval() function.
+  
   Example:
     > @sex me=male
     Set.
-    > s(this [add(1,1)] %s)
+    > s(this [add(1,1)] %p)
     You say "this 2 his" 
+    > eval(this [add(1,1)] %p)
+    You say "this 2 his" 
+    > subeval(this [add(1,1)] %p)
+    You say "this [add(1,1)] his" 
   
-  See Also: SUBSTITUTIONS
+  See Also: SUBSTITUTIONS, eval(), subeval(), ueval(), streval(), u(), v()
   
 & SAFEBUFF()
   Function: safebuff(<list> [,<delim>])
@@ -16230,14 +16242,14 @@
             randextract()
   
 & EXTRACTWORD()
-  Function: extractword(<string> [,<first>, <len>[, <delim>], <sep>] ,<del>]])
+  Function: extractword(<strng>[,<first>,<len>[,<dlim>],<sep>],<del>],<mod>]]])
   
   Extractword returns a string of <len> length words, starting with the first
   word.  This works effectively like extract(), however, the deliminiter 
-  <delim> and separator <sep> can be multi-character.  In addition, the
+  <dlim> and separator <sep> can be multi-character.  In addition, the
   separator may also contain ansi or special characters.
   
-  If you specify only <string> and no other arguments, it returns the first
+  If you specify only <strng> and no other arguments, it returns the first
   word of the string as if the first() function.
   
   If you specify a negative number to <first>, it counts backwards from the end
@@ -16250,6 +16262,10 @@
   
   If you specify the <del> toggle to '1' it assumes delextract() compatibility
   where the words choosen are all the words EXCEPT the range specified.
+  
+  If you specify the <mod> toggle to '1' it will apply a modulo to the <first>
+  argument against the total words in <strng> and wrap-around the value
+  automatically.
    
   Unlike extract(), extractword() is also ansi-aware.
   
@@ -21331,33 +21347,6 @@
   
   See Also: setqmatch(), match(), totmatch(), wildmatch()
   
-& SETQMATCH()
-  Function: setqmatch(<string>, <pattern>[,delim])
- 
-  The setqmatch() function tries to match <pattern> against <string>. If it
-  succeeds, it returns 1 and puts the text that matched each wildcard (up to
-  ten) into successive setq registers. The first wildcard's match goes into
-  register 0, the second into register 1, etc.
- 
-  (If it reaches '10' and there's more, dump the remaining into
-   '10' if '10' is a '*' wildcard and not a '?' wildcard)
- 
-  If it fails, it returns 0.  If optional delimiter of 'n' is specified,
-  then it returns nothing for failures or successes.  Default is 'y' for
-  returning values.
- 
-  Example:
-    > say setqmatch(This is a test, *test) -- [r(0)]
-    You say "1 -- This is a "
-    > say setqmatch(open the door hal, open * ???) -- [r(0)] -- [r(2)]
-    You say "1 -- the door -- a"
-    > say setqmatch(kow, wok)
-    You say "0"
-    > say setqmatch(kow, wok, n)
-    You say ""
-  
-  See Also: listmatch(), match(), totmatch(), wildmatch(), setq()
-  
 & LIST()
   Function: list(<list>, <eval>[, <delim> ][, <header>][, <target>])
  
@@ -23738,7 +23727,7 @@
             setq(!,<string>,<label>)
             setq(+,<string>,<label>)
   
-      -- Penn Compatibility (if enabled) 
+      -- Penn Compatibility (if enabled via penn_setq admin param) 
             setq(<label|register>,<string>)
             setq(+,<string>,<label>)
             setq(!,<string>,<label>)
@@ -23788,7 +23777,7 @@
             setq_old(!,<string>,<label>)
             setq_old(+,<string>,<label>)
   
-      -- Penn Compatibility (if enabled) 
+      -- Penn Compatibility (if enabled via penn_setq admin param) 
             setq_old(<label|register>,<string>)
             setq_old(+,<string>,<label>)
             setq_old(!,<string>,<label>)
@@ -23812,13 +23801,61 @@
 
   See Also: setr_old(), setq(), setr(), nameq(), SETQ_TEMPLATE
   
+& SETQMATCH()
+  Function: setqmatch(<string>, <pattern>[,delim])
+ 
+  The setqmatch() function tries to match <pattern> against <string>. If it
+  succeeds, it returns 1 and puts the text that matched each wildcard (up to
+  ten) into successive setq registers. The first wildcard's match goes into
+  register 0, the second into register 1, etc.
+ 
+  (If it reaches '10' and there's more, dump the remaining into
+   '10' if '10' is a '*' wildcard and not a '?' wildcard)
+ 
+  If it fails, it returns 0.  If optional delimiter of 'n' is specified,
+  then it returns nothing for failures or successes.  Default is 'y' for
+  returning values.
+ 
+  Example:
+    > say setqmatch(This is a test, *test) -- [r(0)]
+    You say "1 -- This is a "
+    > say setqmatch(open the door hal, open * ???) -- [r(0)] -- [r(2)]
+    You say "1 -- the door -- a"
+    > say setqmatch(kow, wok)
+    You say "0"
+    > say setqmatch(kow, wok, n)
+    You say ""
+  
+  See Also: listmatch(), match(), totmatch(), wildmatch(), setq()
+  
+& SETQ_TEMPLATES
+  You can specify 'templates' for setq registers to automatically have 
+  pre-defined labels for each individual object.  This is done by setting
+  a string in the attribute 'SETQ_TEMPLATE' on the object.  The attribute
+  should be in the format:  <register>:<string>
+  
+  So an example would be:   0:foobar 1:xyzzy q:myqreg
+  
+  This would set a template on an object where it would preassign the
+  label 'foobar' to register 0, 'xyzzy' to register 1, and 'myqreg' to
+  register q.
+  
+  Note:  These are only useful for the immediate calling $commands.
+  They are not transversed through u() functions, @triggers, or other
+  action based events.
+  
+  You may redefine these labels as you would normally with nameq(), 
+  setq(), or setr().
+  
+  See Also: nameq(), setq(), setr()
+  
 & SETR()
   Function: setr(<register>,<string>[,<label>])
             setr(<label>,<string>[,<label>])
             setr(!,<string>,<label>)
             setr(+,<string>,<label>)
   
-      -- Penn Compatibility (if enabled) 
+      -- Penn Compatibility (if enabled via penn_setq admin param) 
             setr(<label|register>,<string>)
             setr(+,<string>,<label>)
             setr(!,<string>,<label>)
@@ -23857,7 +23894,7 @@
             setr_old(!,<string>,<label>)
             setr_old(+,<string>,<label>)
   
-      -- Penn Compatibility (if enabled) 
+      -- Penn Compatibility (if enabled via penn_setq admin param) 
             setr_old(<label|register>,<string>)
             setr_old(+,<string>,<label>)
             setr_old(!,<string>,<label>)
@@ -29722,7 +29759,7 @@
     3.9.3: 3.9.3p0, 3.9.3p1, 3.9.3p2
     3.9.4: 3.9.4p0, 3.9.4p1, 3.9.4p2, 3.9.4p3, 3.9.4p4, 3.9.4p5
     3.9.5: 3.9.5p0, 3.9.5p1, 3.9.5p2, 3.9.5p3, 3.9.5p4
-    4.0.0: 4.0.0p0, 4.0.0p1
+    4.0.0: 4.0.0p0, 4.0.0p1, 4.0.0p2
 
 & 1.0.0p0
   Release Date: Aug 1 1989
@@ -32149,6 +32186,10 @@
     of :<value>:>: or :<value>:<: for 'infinite loop' checks.  Normal 
     function invocation and cpu alarms as well as the @admin param 
     iter_loop_max dictates maximums for the looping [ASH]
+  * extractword() takes an optional MOD argument that allows applying a modulo
+    to the 'first' value for automatic wrap-around.
+  * @recover has a /detail switch that now will show attribute details of the
+    target object.
   
   Changes
   ------------
@@ -32160,6 +32201,9 @@
   * optional argument to set() and @set to allow setting attributes with
     a content that starts with '_'  [ASH]
   * COMP() now handles case insensitive, numbers, floats, and dbref#s [ASH]
+  * squish() now offers a second argument to specify count for filler [ASH]
+  * laxed permissions for exits so that they can fetch lcon/lexits on
+    both source and destination points it is linked to [ASH]
   
   Bug Fixes
   ------------
@@ -32179,3 +32223,29 @@
   * mail attributes allowed evaluation of mail functions and it likely
     shouldn't for security reasons [ASH]
   * timeslice config param could crash the game if used [ASH]
+  * corrupted LBUF in functions.c [ASH]
+  * flatfiles loaded with dbref#'s having more than 750 attributes 
+    could be cut off.  [ASH]
+
+& 4.0.0p2
+  Release Date: 05/26/18
+  Status: Alpha
+    
+  New Features
+  ------------
+  * exit_separator @admin param to specify separator between exits [ASH]
+  * help_separator @admin param to specify separator between help [ASH]
+  * @dynhelp/suggest for suggestions if not finding help entry [ASH] 
+  * dynhelp() and textfile() optionally allow suggestions [ASH]
+  * randextract() optionally has weighted values [ASH]
+  
+  Changes
+  ------------
+  * help allows suggestions when it can not find help entry [ASH]
+  * listprotection() has additional arguments to handle @alias [ASH]
+  
+  Bug Fixes
+  ------------
+  * door.c could crash if non-player executed @door/push [ASH]
+  * help separator bug with /search
+  * @tel target= will now give an error message [ASH]

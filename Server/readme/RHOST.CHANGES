@@ -15,6 +15,19 @@ Bug in AUTH and API handling where AUTH lookups happened with internal checks
 				- Thanks Neil "Polk" Stevens 
 @set and set() now allow optionally setting contents starting with '_'.
 				- Thanks Gallifrey@BrazilMUX
+Added better user error handling to the build script.
+				- Thanks qa'toq
+Due to an insanely old bug in singleuser mode with attribute caps, flatfiles
+   would cut off attributes at 750 on dbloading.
+				- Thanks Aqua@MuxNexus
+@recover/detail to show attributes and details of recoverable item
+				- Thanks Ixokai
+Suggestions in help files inspired from PennMUSH.
+				- Thanks PennMUSH (Raevnos)
+@door/push could crash with non-players
+				- Thanks Xperta/Paige
+Startmush had a confusing message for Nyctasia as #1's password
+				- Thanks Ixokai
 
 
                          RhostMUSH 3.9.5 Update File
