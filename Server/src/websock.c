@@ -181,20 +181,19 @@ complete_handshake(DESC *d)
   d->flags |= DS_WEBSOCKETS;
 
   d->checksum[0] = 4;
-
-  *bp = '\0';
-  STARTLOG(LOG_ALWAYS, "NET", "WS")
-  log_text((char *) "WebSockets upgraded successfully, ");
-  log_text(buf);
-  ENDLOG
-
+  
+  welcome_user(d);
+  process_output(d);
 }
 
 int
-is_websocket(const char *command)
+process_websocket_request(DESC *d, const char *command)
 {
   static char REQUEST_LINE[LBUF_SIZE];
   static size_t REQUEST_LINE_LEN = 0;
+  char cbuf[LBUF_SIZE];
+  char *hptr, *cptr;
+  int retval;
 
   if (REQUEST_LINE_LEN == 0) {
     snprintf(REQUEST_LINE, sizeof REQUEST_LINE, "GET %s HTTP/1.1",
@@ -202,38 +201,81 @@ is_websocket(const char *command)
     REQUEST_LINE_LEN = strlen(REQUEST_LINE);
   }
 
-  /* TODO: Full implementation should verify entire request line. */
-  return strncmp(command, REQUEST_LINE, REQUEST_LINE_LEN) == 0;
+  /* TODO: Full implementation should verify entire request. */
+  retval = strncmp(command, REQUEST_LINE, REQUEST_LINE_LEN);
+  
+  if (retval == 0) {
+    STARTLOG(LOG_ALWAYS, "NET", "WS")
+    log_text((char *) "WebSockets upgrade requested.");
+    ENDLOG
+
+    d->flags &= ~DS_API;
+    d->flags |= DS_WEBSOCKETS_REQUEST;
+    
+    /* If there is a newline, we have a multi-line request to process. */
+    if (strstr(command, "\n")) {
+      strncpy(cbuf, command, LBUF_SIZE-1);
+      
+      cptr = cbuf;
+      hptr = strsep(&cptr, "\n");
+      
+      fprintf(stderr, "REQUEST: \"%s\" (multi-line)\n", hptr);
+      
+      while (cptr != NULL) {
+        hptr = strsep(&cptr, "\n");
+        process_websocket_header(d, hptr);
+      }
+    } else {
+      fprintf(stderr, "REQUEST: \"%s\"\n", command);
+    }
+    return 1;
+  }
+  
+  return 0;
 }
 
 int
-process_websocket_request(DESC *d, const char *command)
+process_websocket_header(DESC *d, const char *command)
 {
   static const char *const KEY_HEADER = "Sec-WebSocket-Key:";
 
   static size_t KEY_HEADER_LEN = 0;
-
+  
   if (!KEY_HEADER_LEN) {
     KEY_HEADER_LEN = strlen(KEY_HEADER);
   }
-
+  
   /* TODO: Full implementation should verify entire request. */
   if (*command == '\0') {
     if (!d->checksum[0]) {
       abort_handshake(d);
+
+      STARTLOG(LOG_ALWAYS, "NET", "WS")
+      log_text((char *) "WebSockets handshake failed!");
+      ENDLOG
+
       return 0;
     }
 
     complete_handshake(d);
+
+    STARTLOG(LOG_ALWAYS, "NET", "WS")
+    log_text((char *) "WebSockets upgraded successfully.");
+    ENDLOG
+    
     return 1;
+  } else {
+    fprintf(stderr, "HEADER: \"%s\"\n", command);
   }
 
   if (strncasecmp(command, KEY_HEADER, KEY_HEADER_LEN) == 0) {
     /* Re-using Pueblo checksum field for storing WebSockets key. */
     char *value = skip_space(command + KEY_HEADER_LEN);
+    
     if (value && strlen(value) == WEBSOCKET_KEY_LEN) {
       memcpy(d->checksum, value, WEBSOCKET_KEY_LEN + 1);
     }
+    
   }
 
   return 1;
@@ -448,7 +490,7 @@ write_message(
   } else {
     /* Probably never going to need this code path for typical LBUF_SIZE. */
     int ii;
-
+    
     *dst++ = 127;
 
     for (ii = 56; ii >= 0; ii -= 8) {

@@ -1758,7 +1758,6 @@ queue_write(DESC * d, const char *b, int n)
     
     /* Convert to a WebSockets frame before queuing output */
     if (d->flags & DS_WEBSOCKETS) {
-        /* TODO: Uses a static buffer; probably safe in this case. */
         to_websocket_frame(&b, &n, WEBSOCKET_CHANNEL_TEXT);
     }
     
@@ -1839,7 +1838,8 @@ queue_write(DESC * d, const char *b, int n)
 	left = LBUF_SIZE - sizeof(TBLKHDR) - (tp->hdr.end - (char *) tp);
 
 	if (n <= left) {
-	    strncpy(tp->hdr.end, b, n);
+	    //strncpy(tp->hdr.end, b, n);
+	    memcpy(tp->hdr.end, b, n);
 	    tp->hdr.end += n;
 	    tp->hdr.nchars += n;
 	    n = 0;
@@ -1850,7 +1850,8 @@ queue_write(DESC * d, const char *b, int n)
 	     */
 
 	    if (left > 0) {
-		strncpy(tp->hdr.end, b, left);
+		//strncpy(tp->hdr.end, b, left);
+		memcpy(tp->hdr.end, b, left);
 		tp->hdr.end += left;
 		tp->hdr.nchars += left;
 		b += left;
@@ -1865,6 +1866,7 @@ queue_write(DESC * d, const char *b, int n)
 	    d->output_tail = tp;
 	}
     } while (n > 0);
+    
     VOIDRETURN; /* #117 */
 }
 
@@ -4847,17 +4849,9 @@ do_command(DESC * d, char *command)
     DPUSH; /* #147 */
 
     if (d->flags & DS_WEBSOCKETS_REQUEST) {
-        //STARTLOG(LOG_ALWAYS, "WS", "AUTH")
-        //log_text((char *) "request > ");
-        //log_text(command);
-        //ENDLOG
-        /* Parse WebSockets upgrade request. */
-        if (!process_websocket_request(d, command)) {
-            STARTLOG(LOG_ALWAYS, "NET", "WS")
-            log_text((char *) "WebSockets handshake failed!");
-            ENDLOG
-            RETURN(0);
-        }
+        /* Parse WebSockets handshake, if sent line by line. */
+        /* Since we are using the API port this gets done all at once in the GET request. */
+        process_websocket_header(d, command);
         RETURN(0);
     }
 
@@ -4915,12 +4909,9 @@ do_command(DESC * d, char *command)
     }
 
     if (!(d->flags & DS_CONNECTED)) {
-        if (is_websocket(command)) {
-            STARTLOG(LOG_ALWAYS, "NET", "WS")
-            log_text((char *) "WebSockets upgrade requested.");
-            ENDLOG
+        if (process_websocket_request(d, command)) {
             /* Continue processing as a WebSockets upgrade request. */
-            d->flags |= DS_WEBSOCKETS_REQUEST;
+            /* If the entire header is passed in command, we might be done. */
             RETURN(0);
         }
     }
@@ -5132,7 +5123,7 @@ do_command(DESC * d, char *command)
             }
             break;
         case CMD_GET:
-            if ( !(d->flags & DS_API) || (d->flags & DS_CONNECTED) ) {
+            if ( !(d->flags & DS_API || d->flags) || (d->flags & DS_CONNECTED) ) {
                if ( d->flags & DS_CONNECTED ) {
                   notify_quiet(d->player, "Permission denied.");
                } else {

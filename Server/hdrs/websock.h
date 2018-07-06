@@ -18,8 +18,8 @@
 #define WS_GET_REQUEST_URL "/wsclient"
 
 /* websock.c */
-int is_websocket(const char *command);
 int process_websocket_request(DESC *d, const char *command);
+int process_websocket_header(DESC *d, const char *command);
 int process_websocket_frame(DESC *d, char *tbuf1, int got);
 void to_websocket_frame(const char **bp, int *np, char channel);
 
