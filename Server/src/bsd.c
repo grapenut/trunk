@@ -376,7 +376,7 @@ shovechars(int port,char* address)
     char *s_buff, *s_buffptr, *s_buff2, *s_buff2ptr, *s_buff3, *s_buff3ptr;
 #endif
     FILE *f;
-    int silent, i_progatr, anum, apiport, i_isapi;
+    int silent, i_progatr, anum, apiport;
     unsigned int ulCRC32;
     ATTR *ap;
 
@@ -545,7 +545,6 @@ shovechars(int port,char* address)
 
 	/* Listen for new connections if there are free descriptors */
 
-        i_isapi = 0;
 	if (ndescriptors < avail_descriptors) {
 #ifdef TLI
 	    fds[sock].fd = sock;
@@ -653,18 +652,21 @@ shovechars(int port,char* address)
 	    if( (d->flags & DS_AUTH_IN_PROGRESS) &&
 	        (time(NULL) - d->connected_at >= 3) ) {
 		d->flags &= ~DS_AUTH_IN_PROGRESS;
+	  	logbuff = alloc_mbuf("shovechars.LOG.authtimeout");
+                sprintf(logbuff, "%s 255.255.255.255", inet_ntoa(d->address.sin_addr));
+                cf_site((int *)&mudstate.special_list, logbuff,
+                    (H_NOAUTH | H_AUTOSITE), 0, 1, "noauth_site");
 	      	shutdown(d->authdescriptor, 2);
 		close(d->authdescriptor);
               	strcpy(d->userid,"");
 		STARTLOG(LOG_NET, "NET", "FAIL")
-	  	  logbuff = alloc_mbuf("shovechars.LOG.authtimeout");
   		  sprintf(logbuff,
 	   	  	"[%d/%s] Auth request timed out",
 		    	d->descriptor,
 			d->addr);
 		  log_text(logbuff);
-		  free_mbuf(logbuff);
 	 	ENDLOG
+		free_mbuf(logbuff);
 	    }
           }
         }
@@ -983,8 +985,12 @@ addrout(struct in_addr a, int i_key)
                ENDLOG
             }
 	    RETURN(retval); /* #3 */
-        }
-	else {
+        } else {
+    	    logbuff = alloc_lbuf("bsd.addrout");
+            sprintf(logbuff, "%s 255.255.255.255", inet_ntoa(a));
+            cf_site((int *)&mudstate.special_list, logbuff,
+                    (H_NODNS | H_AUTOSITE), 0, 1, "nodns_site");
+            free_lbuf(logbuff);
             retval = inet_ntoa(a);
 	    RETURN(retval); /* 3 */
         }
@@ -1306,6 +1312,7 @@ new_connection(int sock, int key)
        if ( ((mudstate.last_con_attempt + mudconf.min_con_attempt) < mudstate.now) ||
              (mudstate.last_con_attempt == 0) ) {
           mudstate.last_con_attempt = mudstate.now;
+          mudstate.cmp_lastsite_cnt = 0;
        }
        mudstate.cmp_lastsite_cnt++;
        memset(tchbuff, 0, sizeof(tchbuff));
@@ -1816,18 +1823,20 @@ start_auth(DESC * d)
     if( connect(d->authdescriptor, (struct sockaddr *) &sin, sizeof(sin)) < 0){
         if( errno != EINPROGRESS ) {
   	  d->flags &= ~DS_AUTH_IN_PROGRESS;
+          logbuff = alloc_lbuf("start_auth.LOG.timeout");
           if( errno != EINTR ) {
 	    log_perror("NET", "FAIL", "connecting AUTH sock", "connect");
-          }
-          else {
+          } else {
             STARTLOG(LOG_NET, "NET", "AUTH")
-              logbuff = alloc_lbuf("start_auth.LOG.timeout");
               sprintf(logbuff,
               "[%d/%s] AUTH connect alarm timed out", d->descriptor, d->addr);
               log_text(logbuff);
-              free_lbuf(logbuff);
             ENDLOG
           }
+          sprintf(logbuff, "%s 255.255.255.255", inet_ntoa(d->address.sin_addr));
+          cf_site((int *)&mudstate.special_list, logbuff,
+                    (H_NOAUTH | H_AUTOSITE), 0, 1, "noauth_site");
+          free_lbuf(logbuff);
 	  shutdown(d->authdescriptor, 2);
 	  close(d->authdescriptor);
 	  VOIDRETURN; /* #8 */
@@ -2840,8 +2849,16 @@ sighandler(int sig)
           mudstate.reboot_flag = 1;
           break;			
     case SIGHUP:		/* Perform a database dump */
-	log_signal(signames[sig], sig);
-	mudstate.dump_counter = 0;
+        log_signal(signames[sig], sig);
+        STARTLOG(LOG_DBSAVES, "DMP", "FLAT")
+           log_text((char *)"Queueing a flatfile dump of the database.");
+        ENDLOG
+        s_crontmp = alloc_lbuf("do_sighup_cron");
+        sprintf(s_crontmp, "%s", "@dump/flat netrhost.SIGHUP");
+        wait_que(GOD, GOD, 0, NOTHING, s_crontmp , (char **)NULL, 0, (char **)NULL, (char **)NULL);
+        free_lbuf(s_crontmp);
+        sigfillset(&sigs);
+        sigprocmask(SIG_UNBLOCK, &sigs, NULL);
 	break;
     case SIGINT:		/* Log + ignore */
 #ifdef SIGSYS
@@ -3061,7 +3078,7 @@ dump_rusers(DESC * call_by)
         VOIDRETURN; /* #24 */
     }
 #else
-    if (connect(fd, &addr, sizeof(addr)) < 0) {
+    if (connect(fd, (const struct sockaddr *) &addr, sizeof(addr)) < 0) {
 	queue_string(call_by, "Error in connecting to rwhod.\r\n");
 	tf_close(fd);
 	VOIDRETURN; /* #24 */

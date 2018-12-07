@@ -151,6 +151,7 @@ NDECL(cf_init)
     memset(mudconf.nobroadcast_host, 0, sizeof(mudconf.nobroadcast_host));
     memset(mudconf.guest_namelist, 0, sizeof(mudconf.guest_namelist));
     memset(mudconf.log_command_list, 0, sizeof(mudconf.log_command_list));
+    mudconf.mailmutt = 0;
     mudconf.guest_randomize = 0; /* Randomize guests */
     mudconf.mailsub = 1;
     mudconf.mailbox_size = 99;
@@ -302,6 +303,7 @@ NDECL(cf_init)
     mudconf.function_max = 1000;	/* Maximum functions allowed period */
     mudconf.blind_snuffs_cons = 0;	/* BLIND flag snuff connect/disconnect */
     mudconf.atrperms_max = 100;		/* Maximum attribute prefix perms */
+    mudconf.atrperms_checkall = 0;	/* Check all attrib perms -- can be expensive */
     mudconf.safer_ufun = 0;		/* are u()'s and the like protected */
     mudconf.listen_parents = 0;		/* ^listens do parents */
     mudconf.icmd_obj = -1;		/* @icmd eval object */
@@ -333,6 +335,7 @@ NDECL(cf_init)
     mudconf.null_is_idle = 0;		/* Treat @@ as idle for idle timer */
     mudconf.iter_loop_max = 100000;	/* Maximum loops for infinite loop iter */
     mudconf.vlimit = 400;		/* Runtime vlimit here */
+    mudconf.mtimer = 10;
     memset(mudconf.sub_include, '\0', sizeof(mudconf.sub_include));
     memset(mudconf.cap_conjunctions, '\0', sizeof(mudconf.cap_conjunctions));
     memset(mudconf.cap_articles, '\0', sizeof(mudconf.cap_articles));
@@ -352,6 +355,7 @@ NDECL(cf_init)
     strcpy(mudconf.mysql_socket, (char *)"/var/lib/mysql/mysql.sock");
     mudconf.mysql_port=3306;
 #endif
+    mudstate.nested_control = 0;	/* Nested controlocks - 50 hardcode ceiling */
     mudstate.mail_inline = 0;		/* Mail is inline */
     mudstate.iter_special = 0;		/* iter inf special */
     mudstate.trace_indent = 0;		/* Initialize trace indent */
@@ -1203,6 +1207,28 @@ CF_HAND(cf_mailint)
 	return 0;
     }
 }
+
+CF_HAND(cf_timerint)
+{
+    int vp_old = 0;
+
+    sscanf(str, "%d", &vp_old);
+    if ((vp_old < extra2) || (vp_old > extra)) {
+        if ( !mudstate.initializing) {
+           notify(player, unsafe_tprintf("Value must be between %d and %d.", extra2, extra));
+        }
+	return -1;
+    } else if ( (vp_old != 1) && (vp_old != 10) && (vp_old != 100) && (vp_old != 1000) ) {
+        if ( !mudstate.initializing) {
+           notify(player, unsafe_tprintf("Value must be 1, 10, 100, or 1000.", extra2, extra));
+        }
+	return -1;
+    } else {
+        *vp = vp_old;
+	return 0;
+    }
+}
+
 CF_HAND(cf_verifyint)
 {
     int vp_old = 0;
@@ -1904,7 +1930,7 @@ atrpEval(int key, char *s_attr, dbref player, dbref target, int i_type)
    mybuff[1] = alloc_sbuf("atrpEval2");
    mybuff[2] = alloc_sbuf("atrpEval3");
    mybuff[3] = NULL;
-   strncpy(mybuff[0], s_attr, SBUF_SIZE);
+   strncpy(mybuff[0], s_attr, SBUF_SIZE-1);
    sprintf(mybuff[1], "#%d", target);
    sprintf(mybuff[2], "%d", i_type);
    mudstate.insideaflags = 1;
@@ -1929,10 +1955,14 @@ attrib_cansee(dbref player, const char *name, dbref owner, dbref target)
 {
    ATRP *atrp;
    dbref i_player;
+   int i_return;
 
    i_player = player;
-   if ( Typeof(player) != TYPE_PLAYER )
+   if ( Typeof(player) != TYPE_PLAYER ) {
       i_player = Owner(player);
+   }
+   
+   i_return = -1;
 
    for (atrp = atrp_head; atrp; atrp = atrp->next) {
       if ( ((atrp->owner == -1) || (atrp->owner == owner)) && 
@@ -1950,11 +1980,20 @@ attrib_cansee(dbref player, const char *name, dbref owner, dbref target)
                  ((HasPriv(player, NOTHING, POWER_EX_FULL, POWER5, NOTHING) && ExFullWizAttr(player)) && atrvWiz(atrp->flag_see)) ||
                   atrpEval(atrp->flag_see, (char *)name, player, target, 0) ||
                   atrpCit(atrp->flag_see) ) {
-               return 1;
+               i_return = 1;
+            } else {
+               if ( i_return == -1 ) {
+                  i_return = 0;
+               }
             }
-            return 0;
+            if ( !mudconf.atrperms_checkall ) {
+               return i_return;
+            }
          }
       }
+   }
+   if ( i_return == -1 ) {
+      i_return = 1;
    }
    return 1;
 }
@@ -1964,10 +2003,14 @@ attrib_canset(dbref player, const char *name, dbref owner, dbref target)
 {
    ATRP *atrp;
    dbref i_player;
+   int i_return;
 
    i_player = player;
-   if ( Typeof(player) != TYPE_PLAYER )
+   if ( Typeof(player) != TYPE_PLAYER ) {
       i_player = Owner(player);
+   }
+
+   i_return = -1;
 
    for (atrp = atrp_head; atrp; atrp = atrp->next) {
       if ( ((atrp->owner == -1) || (atrp->owner == owner)) && 
@@ -1984,13 +2027,22 @@ attrib_canset(dbref player, const char *name, dbref owner, dbref target)
                  (!(Wanderer(player) || Guest(player)) && atrpPreReg(atrp->flag_set)) ||
                   atrpEval(atrp->flag_set, (char *)name, player, target, 1) ||
                   atrpCit(atrp->flag_set) ) {
-               return 1;
+               i_return = 1;
+            } else {
+               if ( i_return == -1 ) {
+                  i_return = 0;
+               }
             }
-            return 0;
+            if ( !mudconf.atrperms_checkall ) {
+               return i_return;
+            }
          }
       }
    }
-   return 1;
+   if ( i_return == -1 ) {
+      i_return = 1;
+   }
+   return i_return;
 }
 
 char *
@@ -2068,10 +2120,10 @@ add_perms(dbref player, char *s_input, char *s_output, char **cargs, int ncargs)
    i_see = i_set = i_owner = i_target = i_enactor = -1; 
    t_strtok = strtok_r(s_output, " \t", &t_strtokptr);
    if ( t_strtok ) {
-      i_see = atoi(t_strtok);
+      i_set = atoi(t_strtok);
       t_strtok = strtok_r(NULL, " \t", &t_strtokptr);
       if ( t_strtok ) {
-         i_set = atoi(t_strtok);
+         i_see = atoi(t_strtok);
          t_strtok = strtok_r(NULL, " \t", &t_strtokptr);
          if ( t_strtok ) {
             if ( *t_strtok == '#' )
@@ -2113,7 +2165,7 @@ add_perms(dbref player, char *s_input, char *s_output, char **cargs, int ncargs)
          return;
       }
    }
-   notify(player, unsafe_tprintf("Entry added [%d of %d used].", i_atrperms_cnt, mudconf.atrperms_max));
+   notify(player, unsafe_tprintf("Entry added [%d of %d used].", i_atrperms_cnt + 1, mudconf.atrperms_max));
    atrp  = (ATRP *) malloc(sizeof(ATRP));
    atrp->name = alloc_sbuf("attribute_perm_array");
    memset(atrp->name, '\0', SBUF_SIZE);
@@ -2401,6 +2453,9 @@ display_perms(dbref player, int i_page, int i_key, char *fname)
        notify(player, safe_tprintf(tprbuff, &tprpbuff, 
                                    "----------------------------[%6d/%6d max]-------------------------------", 
                                    i_cnt, ((mudconf.atrperms_max > 10000) ? 10000 : mudconf.atrperms_max)));
+    if ( mudconf.atrperms_checkall ) {
+       notify(player, "All @aflag permissions are checked against lowest permission.");
+    }
     notify(player, "Note: Immortals are treated as god with regards to seeing attributes.");
     free_lbuf(tprbuff);
 }
@@ -3662,6 +3717,9 @@ CONF conftable[] =
     {(char *) "atrperms",
      cf_atrperms, CA_GOD | CA_IMMORTAL, (int *) mudconf.atrperms, LBUF_SIZE - 2, 0, CA_WIZARD,
      (char *) "Prefix permission masks for attributes."},
+    {(char *) "atrperms_checkall",
+     cf_bool, CA_GOD | CA_IMMORTAL, &mudconf.atrperms_checkall, 0, 0, CA_WIZARD,
+     (char *) "Are @aflag attribute permissions checked to lowest?"},
     {(char *) "atrperms_max",
      cf_int, CA_GOD | CA_IMMORTAL, &mudconf.atrperms_max, 0, 0, CA_WIZARD,
      (char *) "Max Attribute Prefix Permissions?\r\n"
@@ -4392,6 +4450,9 @@ CONF conftable[] =
     {(char *) "mailprog",
      cf_string, CA_GOD | CA_IMMORTAL, (int *) mudconf.mailprog, 16, 0, CA_WIZARD,
      (char *) "Program used for autoregistering (Def. elm)."},
+    {(char *) "mailmutt",
+     cf_bool, CA_GOD | CA_IMMORTAL, &mudconf.mailmutt, 0, 0, CA_PUBLIC,
+     (char *) "Do you want MUTT compatibility for mail?"},
     {(char *) "mailsub",
      cf_bool, CA_GOD | CA_IMMORTAL, &mudconf.mailsub, 0, 0, CA_WIZARD,
      (char *) "Are subjects included in autoregistration?"},
@@ -4446,6 +4507,10 @@ CONF conftable[] =
     {(char *) "motd_message",
      cf_string, CA_GOD | CA_IMMORTAL, (int *) mudconf.motd_msg, 1024, 0, CA_WIZARD,
      (char *) "Text used for @motd online."},
+    {(char *) "mtimer",
+     cf_timerint, CA_GOD | CA_IMMORTAL, &mudconf.mtimer, 1000, 1, CA_WIZARD,
+     (char *) "The milisecond timer offset to be used.\r\n"\
+              "                             Default: 10   Value: %d"},
     {(char *) "muddb_name",
      cf_string, CA_DISABLED, (int *) mudconf.muddb_name, 32, 0, CA_PUBLIC,
      (char *) "The name used for the RhostMUSH DB's (mail/news)."},
@@ -5580,6 +5645,9 @@ void list_options_values(dbref player, int p_val, char *s_val)
            (tp->interpreter == cf_int_runtime) ||
            (tp->interpreter == cf_mailint) ||
            (tp->interpreter == cf_vint) ||
+           (tp->interpreter == cf_verifyint) ||
+           (tp->interpreter == cf_verifyint_mysql) ||
+           (tp->interpreter == cf_timerint) ||
            (tp->interpreter == cf_chartoint) ||
            (tp->interpreter == cf_recurseint)) &&
           (check_access(player, tp->flags2, 0, 0))) {
@@ -5599,6 +5667,9 @@ void list_options_values(dbref player, int p_val, char *s_val)
            (tp->interpreter == cf_int_runtime) ||
            (tp->interpreter == cf_mailint) ||
            (tp->interpreter == cf_vint) ||
+           (tp->interpreter == cf_verifyint) ||
+           (tp->interpreter == cf_verifyint_mysql) ||
+           (tp->interpreter == cf_timerint) ||
            (tp->interpreter == cf_chartoint) ||
            (tp->interpreter == cf_recurseint)) &&
           (check_access(player, tp->flags2, 0, 0))) {
@@ -5687,6 +5758,7 @@ void cf_display(dbref player, char *param_name, int key, char *buff, char **bufc
                     (tp->interpreter == cf_int_runtime) ||
                     (tp->interpreter == cf_mailint) ||
                     (tp->interpreter == cf_vint) ||
+                    (tp->interpreter == cf_timerint) ||
                     (tp->interpreter == cf_chartoint) ||
                     (tp->interpreter == cf_recurseint) ||
 		    (tp->interpreter == cf_sidefx && !bVerboseSideFx)) {

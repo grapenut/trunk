@@ -58,7 +58,7 @@ time_format_1(time_t dt)
 }
 
 static const char *
-time_format_2(time_t dt)
+wiz_time_format_2(time_t dt)
 {
     register struct tm *delta;
     static char buf[64];
@@ -925,7 +925,7 @@ DESC	*d;
         DESC_ITER_CONN(d) {
           if (d->player == player) {
              sprintf(tbuf, "%-10d %-10s %-10s %s", d->descriptor, time_format_1(mudstate.now - d->last_time),
-                     time_format_2(mudstate.now - d->connected_at), inet_ntoa(d->address.sin_addr));
+                     wiz_time_format_2(mudstate.now - d->connected_at), inet_ntoa(d->address.sin_addr));
              notify(player, tbuf);
           }
         }
@@ -2677,6 +2677,9 @@ void do_snapshot(dbref player, dbref cause, int key, char *buff1, char *buff2)
                    break;
                 }
                 s_pt++;
+            }
+            if ( strstr(buff2, ".img") != NULL ) {
+               i_count = 1;
             }
             if ( i_count ) {
                notify(player, "Invalid characters specified in filename.");

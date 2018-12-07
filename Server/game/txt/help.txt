@@ -20,19 +20,25 @@
   
   You may use the /search switch for content searching.  Eg: help/search *mail*
   
+  You may use the /query switch for detailed searching.  Eg: help/query *mail*
+  
   Command syntax help is available by issuing /syntax. Eg: @emit/syntax
   
   If there are any errors in the help text, please notify a Wizard.
   An HTML version of all the help contained here is available at
   http://rhostmush.com/autohelp/help.html
   
+& plushelp
 & +help
   If enabled (please check @list options), this will work just like normal
   'help' does, but for +help.  This is intended for TINY/MUX compatibility
   and is disabled by default.
   
-  The /search switch works for +help as well.
+  The following switches work for +help:
+    /search -- allow wildcard patterning for searches (Eg: help/search *@mail*)
+    /query  -- allow detailed searching and return (Eg: help/query *@mail*)
   
+  See Also: help 
 
 & register
 & connect
@@ -609,7 +615,10 @@
 & \?
 & WILDCARDS
 & GLOBBING
-  Topic:  WILDCARDS [* and ?]
+  Topic:  WILDCARDS [* and ?]  (also referred to as GLOBBING)
+  
+  Note: RhostMUSH also supports regular expressions.  Please refer to 
+        'help REGEXPS'
   
   Wildcards are the standard globbing mechanism for the mush engine.  With the
   wildcards, the '*' character is considered 0 or more characters and the '?'
@@ -662,7 +671,7 @@
   Additional matching:
     You may use regular expressions instead of globbing if you set the 
     attribute in question REGEXP (help attribute flag).  To use 
-    regular expressions instead, please check 'help regexp'.
+    regular expressions instead, please check 'help REGEXPS'.
   
   See Also: ATTRIBUTE FLAG, REGEXP, $-command
 
@@ -1002,7 +1011,11 @@
   *NOT* working on players.  Talk to your local administration to see if 
   this option has been enabled or disabled.
   
-  See Also: ARBITRARY COMMANDS
+  For normal globbing command syntax, please refer to:
+                    'help ARBITRARY COMMANDS'
+  
+  For regular expression (regex) command syntax, please refer to:
+                    'help REGEXPS'
   
 & colors
   
@@ -2311,6 +2324,30 @@
   
   See Also: rest(), before(), after(), extract(), extractword()
   
+& STDERR()
+  Function: stderr(<string> [,<key>])
+  
+  This function will take the input string and optionally redirect it based
+  on it being a recognized function error (starting with #-1) or not.  By
+  default, this function will null out the error entirely.  
+  
+  The following keys are available:
+    0 - null the output of the string that starts with #-1 (default)
+    1 - null the output of the string that starts with #-1
+        In addition, notify() to the player the actual error that started
+        with #-1 so it's no longer part of the function stack.
+  
+  Examples:
+    > say [iter(1 3 5 [lrand(1,3)],##)]
+    You say "1 3 5 #-1 FUNCTION (LRAND) EXPECTS 3 OR 4 ARGUMENTS [RECEIVED 2]" 
+    > say [iter(1 3 5 [stderr(lrand(1,3))],##)]
+    You say "1 3 5"
+    > say [iter(1 3 5 [stderr(lrand(1,3),1)],##)]
+    STDError: #-1 FUNCTION (LRAND) EXPECTS 3 OR 4 ARGUMENTS [RECEIVED 2]
+    You say "1 3 5"
+  
+  See Also: null(), @@()
+
 & FIRSTOF()
 & ALLOF()
 & STRFIRSTOF()
@@ -4305,6 +4342,7 @@
   
 { 'help @lock locks2' for more  or 'help @lock type <type>' for locktype help}
   
+& @lock/receivelock
 & @lock type ReceiveLock
   Lock Type: ReceiveLock
   Syntax   : @lock/receive <target>=<key>
@@ -4318,6 +4356,7 @@
   Rooms, Exits:
      This lock is meaningless on exits and rooms.
   
+& @lock/parentlock
 & @lock type ParentLock
   Lock Type: ParentLock
   Syntax   : @lock/parent <target>=<key>
@@ -4326,6 +4365,7 @@
      This lock determins who may parent (@parent) an item to the target.  If
      you do not pass the lock, you will be unable to parent something to it.
   
+& @lock/pagelock
 & @lock type PageLock
   Lock Type: PageLock
   Syntax   : @lock/page <target>=<key>
@@ -4339,6 +4379,7 @@
   Rooms, Exits, Objects:
      This lock is meaningless on rooms, exits, and objects.
   
+& @lock/linklock
 & @lock type LinkLock
   Lock Type: LinkLock
   Syntax   : @lock/link <target>=<key>
@@ -4352,6 +4393,7 @@
   Exits:
      This lock is meaningless on exits.
   
+& @lock/leavelock
 & @lock type LeaveLock
   Lock Type: LeaveLock
   Syntax   : @lock/leave <target>=<key>
@@ -4364,6 +4406,7 @@
   Exits, Rooms:
      This lock is meaningless on rooms and exits.
   
+& @lock/givelock
 & @lock type GiveLock
   Lock Type: GiveLock
   Syntax   : @lock/give <target>=<key>
@@ -4376,6 +4419,7 @@
   Exits, Rooms:
      This lock is meaningless on rooms and exits.
   
+& @lock/enterlock
 & @lock type EnterLock
   Lock Type: EnterLock
   Syntax   : @lock/enter <target>=<key>
@@ -4394,6 +4438,7 @@
   Exits:
      This lock is meaningless for exits.
   
+& @lock/defaultlock
 & @lock type DefaultLock
   Lock Type: Defaultlock 
   Syntax   : @lock <target>=<key>
@@ -4439,6 +4484,7 @@
   
 { 'help @lock locks3' for more  or 'help @lock type <type>' for locktype help}
   
+& @lock/zonetolock
 & @lock type ZoneToLock
   Lock Type: ZoneToLock
   Syntax   : @lock/zoneto <target>=<key>
@@ -4448,6 +4494,7 @@
      zone.  This works similiar to the ParentLock with regards to @parents.
      If the lock does not exist, only those who control the item may @zone it.
   
+& @lock/zonewizlock
 & @lock type ZoneWizLock
   Lock Type: ZoneWizLock
   Syntax   : @lock/zonewiz <target>=<key>
@@ -4462,6 +4509,7 @@
      If it is WIZARD or higher owned, then it follows normal permissions on
      that target to what they can do with it.
   
+& @lock/twinklock
 & @lock type TwinkLock
   Lock Type: TwinkLock
   Syntax   : @lock/twink <target>=<key>
@@ -4498,6 +4546,7 @@
                  also customize your @lock/twink to check %w against the
                  target player dbref# with a complex lock.
   
+& @lock/userlock
 & @lock type UserLock
   Lock Type: UserLock
   Syntax   : @lock/user <target>=<key>
@@ -4525,6 +4574,7 @@
      In condition 2 and 3, if the lock doesn't exist, it assumes pass 
      automatically.
   
+& @lock/uselock
 & @lock type UseLock
   Lock Type: UseLock
   Syntax   : @lock/use <target>=<key>
@@ -4544,6 +4594,7 @@
     
   See Also: SHOWFAILCMD
  
+& @lock/tportlock
 & @lock type TportLock
   Lock Type: TportLock
   Syntax   : @lock/tport <target>=<key>
@@ -4557,6 +4608,7 @@
   Players, Exits:
      This lock is meaningless on players and exits.
   
+& @lock/teloutlock
 & @lock type TeloutLock
   Lock Type: TeloutLock
   Syntax   : @lock/telout <target>=<key>
@@ -4571,6 +4623,7 @@
   Exits:
      This lock is meaningless on exits.
   
+& @lock/speechlock
 & @lock type SpeechLock
   Lock Type: SpeechLock
   Syntax   : @lock/speech <target>=<key>
@@ -4585,6 +4638,7 @@
   Exits:
      This lock is meaningless on exits.
   
+& @lock/droplock
 & @lock type DropLock
   Lock Type: DropLock
   Syntax   : @lock/drop <target>=<key>
@@ -4615,6 +4669,7 @@
   
   See Also: mail lock
   
+& @lock/givetolock
 & @lock type GiveToLock
   Lock Type: GiveToLock
   Syntax   : @lock/giveto <target>=<key>
@@ -4629,6 +4684,7 @@
   Exits:
      This lock is meaningless on exits.
   
+& @lock/getfromlock
 & @lock type GetFromLock
   Lock Type: GetFromLock
   Syntax   : @lock/getfrom <target>=<key>
@@ -4646,6 +4702,7 @@
   Exits:
      This lock is meaningless on exits.
   
+& @lock/droptolock
 & @lock type DropToLock
   Lock Type: DropToLock
   Syntax   : @lock/dropto <target>=<key>
@@ -4660,6 +4717,7 @@
   Exits, Players:
      This lock is meaningless on players and exits.
   
+& @lock/openlock
 & @lock type OpenLock
   Lock Type: OpenLock
   Syntax   : @lock/open <target>=<key>
@@ -4673,6 +4731,7 @@
   Players, Exits:
      This lock is meaningless on players and exits.
   
+& @lock/darklock
 & @lock type DarkLock
   Lock Type: DarkLock
   Syntax   : @lock/dark <target>=<key>
@@ -4690,6 +4749,7 @@
      normally.  Please note that all items inside that room that are dark
      are treated on a separate basis for the DarkLocks.
   
+& @lock/chownlock
 & @lock type ChownLock
   Lock Type: ChownLock
   Syntax   : @lock/chown <target>=<key>
@@ -10021,6 +10081,9 @@
 & ARBITRARY COMMANDS
   Topic: ARBITRARY COMMANDS
  
+  If you wish to see the help for regular expression pattern matching, please
+  refer to 'help REGEXPS'.
+  
   You may define commands that are triggered whenever someone enters a command
   that matches the command template (wildcarding allowed).  These commands
   are called arbitrary commands, user-defined commands, or $-commands (for how
@@ -10056,7 +10119,10 @@
   The following attributes are never checked for $-commands: ALIAS CHARGES
   DESC DROP FAIL IDESC ODESC ODROP OFAIL OSUCC SEX SUCC.
   
-  All $commands and ^listen pairs may be parsed using regular expressions.   
+  You may set the attribute with the $command or ^listen REGEXP which will
+  allow matching against regular expressions instead of globbing.  In 
+  such a case, all $commands and ^listen pairs would be parsed using 
+  regular expressions.   
   
   See Also: @set, &, VATOVZ, ZATOZZ, $-COMMANDS, REGEXPS
   
@@ -11148,14 +11214,15 @@
   SOUNDEX()       SOUNDLIKE()     SOUNDSLIKE()   SPACE()        SPELLNUM()   
   SPLICE()        SQL()           SQLESCAPE()    SQLOFF()       SQLON()      
   SQLPING()       SQLITE_QUERY()  SQRT()         SQUISH()       STARTTIME()  
-  STARTSECS()     STATS()         STEP()         STR()          STRCAT()     
-  STRDISTANCE()   STREQ()         STREVAL()      STRFUNC()      STRIP()      
-  STRIPACCENTS()  STRIPANSI()     STRLEN()       STRMATCH()     STRMATH()    
-  SUB()           SUBEVAL()       SUBJ()         SUBNETMATCH()  SWITCH()     
-  SWITCHALL()     T()             TAN()          TEL()          TIME()       
-  TIMEFMT()       TOBIN()         TODEC()        TOGGLE()       TOHEX()      
-  TOOCT()         TOTCMDS()       TOTMATCH()     TOTMEMBER()    TOTPOS()     
-  TOTWILDMATCH()  TR()            TRACE()        TRANSLATE()    TRIM()
+  STARTSECS()     STATS()         STDERR()       STEP()         STR()        
+  STRCAT()        STRDISTANCE()   STREQ()        STREVAL()      STRFUNC()    
+  STRIP()         STRIPACCENTS()  STRIPANSI()    STRLEN()       STRMATCH()   
+  STRMATH()       SUB()           SUBEVAL()      SUBJ()         SUBNETMATCH()
+  SWITCH()        SWITCHALL()     T()            TAN()          TEL()        
+  TIME()          TIMEFMT()       TOBIN()        TODEC()        TOGGLE()     
+  TOHEX()         TOOCT()         TOTCMDS()      TOTMATCH()     TOTMEMBER()  
+  TOTPOS()        TOTWILDMATCH()  TR()           TRACE()        TRANSLATE()  
+  TRIM()
 
 { 'help function list5' for more }
 
@@ -11263,7 +11330,7 @@
                       LOCKENCODE() LOCALIZE() MOON() NAMEQ() NULL() 
                       PARENMATCH() PID() PRIVATIZE() PUSHREGS() R() 
                       SANDBOX() SETQ() SETQ_OLD() SETQMATCH() SETR() SETR_OLD()
-                      SOUNDEX() SOUNDLIKE() TRACE()
+                      SOUNDEX() SOUNDLIKE() STDERR() TRACE()
             See Also: help miscellaneous functions
   
   Object Information: APOSS() ART() ATTRCNT() CNAME() CONTROLS() DEFAULT() 
@@ -14635,12 +14702,14 @@
   See Also: dist2d()
   
 & REMIT()
-  Function: remit(<list of locations>,<string> [,<to-reality-toggle>])
+  Function: remit(<list of locations>, <string> [,<to-reality-tog>] [,<key>])
   
   The remit() side-effect function is used to emit the given <string> to every
   location specified in the <list of locations>.
   
-  This works similarilly to @pemit/list/contents.
+  This works similarilly to @pemit/list/contents.  By default ## is substitute
+  for every <location> in the list.  This evaluates by default for every 
+  location in the list.
   
   This function relies on the config parameter 'pemit_any_object' to
   be enabled to allow remitting to any room, otherwise, it will only
@@ -14649,10 +14718,14 @@
   This side-effect must be enabled (@list options to see if it is) before it
   can be used.  Anything using it must have the SIDEFX flag set.
    
-  If the <to-reality-toggle> is set to '1', then it assumes the remit is
+  If the <to-reality-tog> is set to '1', then it assumes the remit is
   a 'to-reality' model, in which the <list of locations> takes the form:
   
        reality1 reality2 ... realityN/location1 location2 ... locationN
+  
+  Following <key> values exist:
+    1 - Disable ## from evaluating in <string>.
+    2 - Only evaluate once.  By default this disables ## from evaluating.
  
   Example:
     > say remit(here #0,Boo)
@@ -16698,10 +16771,12 @@
   Function: loc(<object>)
  
   Returns the number of the location where <object> is.  You must either
-  control the object or be nearby for it to work.  When used on an exit it
-  returns the destination of the exit.  You can also use loc() to find the
-  location of players that are not set UNFINDABLE.
- 
+  control the object or be nearby for it to work.  You can also use loc() 
+  to find the location of players that are not set UNFINDABLE (or DARK).
+  
+  When used on an exit it returns the *destination* of the exit, not the
+  location. Use the home() function on exits to find their location.
+  
   Example:
     > look
     Mortal's Room(#367R)
@@ -16719,7 +16794,7 @@
     > say loc(here)
     You say "#367"
   
-  See Also: rloc(), room(), where()
+  See Also: rloc(), room(), where(), home()
   
 & RLOC()
   Function: rloc(<object>,<levels>)
@@ -16738,6 +16813,11 @@
   rloc(<object>,0) is the same as num(<object>), and rloc(<object>,1) is the
   same as loc(<object>).
   
+  When used on an exit, it will return the exits dbref#.  Exits do not have
+  a nested location so it returns itself.  If you want the exit's location 
+  use the home() function. If you want the exit's destination use the loc()
+  function.
+   
   Example:
     > look
     Object(#123p)
@@ -16752,7 +16832,7 @@
     > say rloc(me,2)
     You say "#124"
   
-  See Also: loc(), where()
+  See Also: loc(), where(), home()
   
 & ERROR()
   Function: error([<target>])
@@ -17972,7 +18052,10 @@
   home(<object>)
  
   Returns the object's home.
- 
+  
+  If used on an exit, it will return the exit's *location*.  Exits do
+  not have a 'home' other than their location.
+   
   Example:
     > exam me
     Mortal(#226Pc)
@@ -17985,7 +18068,7 @@
     > say home(me)
     You say "#367"
   
-  See Also: loc(), room(), @link
+  See Also: loc(), room(), rloc(), @link
   
 & MONEY()
   Function: money(<object>)
@@ -18393,7 +18476,7 @@
 
 & CAPLIST()
   Function: caplist(<list>[,<delim>[,<osep>[,<key>[,<type>]]]])
-
+  
   Returns <list> with the first character of each word capitalized.  You may
   specify an optional <delim> as a delimiter for the list input, otherwise the
   default of space will be used.  You may also specify an optional <osep>
@@ -18402,21 +18485,25 @@
   Additionally, an optional <key> may be specified which alters the behavior
   of the function slightly.  The key must be one of the following characters:
     - L:    Reduces the entire list to lower case before capitalization is
-            performed.
+            performed.  Allows <type> value.
     - N:    Performs capitalization naturally, and does not affect any other
             characters in the list (default).
     - T:    Performs a 'true' capitalization based on currently English
-            definition for titles.
+            definition for titles.  Allows <type> value.
   
-  A <type> of '1' will work with <key> values of 'L' or 'T' to optionally 
-  capitalize all words contained in a hyphon, optionally.  The default
-  behavior is to capitalize only the start of the word.  This <type> value
-  has no influence on the 'N' <key> type.
+  The following <type> values exist for special handling with <key>
+  'L' or 'T'.  These work as bitmasks so add the values:
+       1  - capitalize all words after a hyphon -.
+       2  - capitalize all words after a right parenthesis (.
+       4  - capitalize all words after a right bracket [.
+       8  - capitalize all words after a right brace {.
+      16  - capitalize all words after a double quote ".
+      32  - capitalize all words after a single quote '.
    
   Example:
     > say caplist(the mAn in thE mOon).
     You say "The MAn In ThE MOon."
-
+  
     > say caplist(the mAn in thE mOon,,|,L).
     You say "The|Man|In|The|Moon."
   
@@ -18728,7 +18815,10 @@
   Returns the number of the room that <obj> is in, or would be in if it
   executed LEAVE commands until it got to a room.  You can find out the
   containing room of objects you own, nearby objects, and findable players.
- 
+  
+  If used on an exit, it returns the exits *destination*.  If you wish to
+  return the location of the exit, use the home() function.
+   
   Example:
     > I
     You are carrying:
@@ -20277,7 +20367,8 @@
     > say [@@(this is a test[setq(0,test)])]- [r(0)]
     You say "- "
   
-  See Also: localize(), eval(), subeval(), null(), privatize(), sandbox()
+  See Also: localize(), eval(), subeval(), null(), privatize(), sandbox(), 
+            stderr()
   
 & NULL()
   Function: null(<string>)
@@ -20290,7 +20381,8 @@
     > say [null(this is a test[setq(0,test)])]- [r(0)]
     You say "- test"
   
-  See Also: localize(), eval(), subeval(), @@(), privatize(), sandbox()
+  See Also: localize(), eval(), subeval(), @@(), privatize(), sandbox(),
+            stderr()
   
 & STEP()
   Function: step([<obj>/]<attr>,<list>,<step size>[,<delim>[,<output delim>]])
@@ -20557,16 +20649,21 @@
   
   See Also: switch(), reswitchi(), reswitchi(), reswitchall(), regexps
 
+& if()
 & ifelse()
   Function: ifelse(<expression>,<true string>[,<false string>])
  
   This function returns <true string> if <expression> is true (not 0), 
   <false string> otherwise. Much more efficient than an equivalent
   switch(). To check if a string contains text or not, use strlen() within
-  the test case.  The false string is optional and if nothing is specified, 
-  it will return an empty string if a false match is met.  This will 
-  effectively mimic the if() function found on other servers.
+  the test case.  
   
+  The false string is optional and if nothing is specified, it will return 
+  an empty string if a false match is met.  This will effectively mimic 
+  the if() function found on other servers.
+  
+  This function is aliased to if().
+   
   Example:
     > say ifelse(v(test),Test exists!,Test doesn't exist.)
     You say "Test doesn't exist."
@@ -21207,17 +21304,18 @@
   You say ""
   
 & PEMIT()
-  Function: pemit(<object> [<object2> ...],<string> [,<key>])
+  Function: pemit(<object1> [<object2> ... <objectN>], <string> [,<key>])
   
   The pemit() function is a side-effect for the @pemit/list command.  All
   restrictions and permissions of that command follow this function.  The
-  SIDEFX flag is required to use pemit().
+  SIDEFX flag is required to use pemit().  Pemit() by default evaluates
+  for every target in the list.  It does NOT evaluate ## by default.
   
-  You may specify an optional <key> of '1' if you wish to have ##
-  substituted for every target object in the list.  Keep in mind the '##'
-  is pre-processed like iter's ## would be and could be a security risk
-  if used improperly.  I'd strongly suggest filtering the target list
-  as dbref#'s to keep it safe.
+  The following key values are allowable:
+    1 - will have ## substituted for every target object in the list.  Keep 
+        in mind the '##' is pre-processed like iter's ## would be and could 
+        be a security risk if used improperly.  
+    2 - only evaluate once.  This by default disables ## from evaluation.
   
   Type @list options to see if this side-effect is enabled.
   
@@ -21531,16 +21629,22 @@
   See Also: @wipe, @set, &, set()
   
 & ZEMIT()
-  Function: zemit(<list of zones>,<text>)
+  Function: zemit(<list of zones>, <text> [,<key>])
   
   The zemit() function returns 'text' to every room of every zone in
   the specified list.  If the target zone is not a zonemaster, but still
   is contained in a zone, then it will just return the text to that room.
+  This function by default evaluates '##' for each zone in the list and
+  evaluates separately for every zone member.
   
   This works similiarilly to @pemit/zone/list
   
   Check @list options to see if this side-effect is enabled.  
   Anything using this side-effect must have the SIDEFX flag set.
+  
+  Following <key> values exist:
+    1 - disable ## substitution.
+    2 - evaluate only once for every zone in list (disables ## automatically)
   
   Examples:
     > @zone here=#0
@@ -22589,7 +22693,14 @@
  
   This function converts seconds to a single time element which is
   the lowest approximation to the given number of <seconds>.
- 
+  
+  The following letters are relevant:
+    s - second    d - day     y - year               e - epoch
+    m - minute    w - week    C - century
+    h - hour      M - month   a - annum(Millennium)
+  
+  Note:  an epoch is 1 million years or more.
+    
   Example:
     > say singletime(45)
     You say "45s"
@@ -22599,6 +22710,7 @@
     You say "1d"
  
   Related Topics: secs(), time(), timefmt()
+
 & CTU()
   Function: ctu(<number>, <units-from>, <units-to>)
   
@@ -24161,6 +24273,7 @@
   Function: ishidden(<player>)
   
   This function currently is not available to non-bitted players.
+  This returns TRUE if the playere is set hidden.
   
   Example:
     > say ishidden(#1)
@@ -28796,6 +28909,9 @@
   
   (This help text is largely from PennMUSH, with permission)
   
+  If you wish to see the help for the normal globbing command execution,
+  please refer to the help 'ARBITRARY COMMANDS'.
+  
   The majority of matching in MUSH is done with wildcard ("globbing")
   patterns. There is a second type of matching, using regular expressions,
   that is available in certain circumstances.
@@ -28820,10 +28936,16 @@
   player to enter a string and a number ('+setnum <player>=<number>',
   for example), you might do it like this:
   
-  &DO_NUM Command Object=$^\+setnum (.+)=([0-9]+)$: @va me=Data: %1 = %2
-  @set Command Object/DO_NUM = regexp
+  > &DO_NUM Command Object=$^\+setnum (.+)=([0-9]+)$: @va me=Data: %1 = %2
+  Set.
+  > @set Command Object/DO_NUM = regexp
+  Set.
+  > +setnum cookie=30
+  > ex Command Object/va
+  Data: cookies = 30
   
-  Then, '+setnum cookies=30' would set VA to "Data: cookies = 30".
+  How it works:
+  '+setnum cookies=30' would set VA to "Data: cookies = 30".
   This eliminates your having to check to see if the player entered
   a number, since the regular expression matches only numbers.
   Furthermore, the '+' guarantees that there needs to be at least
@@ -28879,7 +29001,7 @@
               or,  extends the meaning of ( after a (
        *      0 or more quantifier
        +      1 or more quantifier
-
+  
 {continued in 'help regexp syntax3'}
 
 & REGEXP SYNTAX3
@@ -29548,6 +29670,7 @@
   space()       - Returns X number of whitespace.
   splice()      - Splices two lists together.
   squish()      - Removes excess spaces or delimiters from a string.
+  stderr()      - Convert all #-1 errors to notify() and not the stack.
   str()         - Like after(), and similar to C strstr().
   strdistance() - Calculates the levenshtein distance between two strings.
   streq()       - Compares two strings, returning true if they match.
@@ -29759,7 +29882,7 @@
     3.9.3: 3.9.3p0, 3.9.3p1, 3.9.3p2
     3.9.4: 3.9.4p0, 3.9.4p1, 3.9.4p2, 3.9.4p3, 3.9.4p4, 3.9.4p5
     3.9.5: 3.9.5p0, 3.9.5p1, 3.9.5p2, 3.9.5p3, 3.9.5p4
-    4.0.0: 4.0.0p0, 4.0.0p1, 4.0.0p2
+    4.0.0: 4.0.0p0, 4.0.0p1, 4.0.0p2, 4.0.0p3
 
 & 1.0.0p0
   Release Date: Aug 1 1989
@@ -32238,14 +32361,68 @@
   * @dynhelp/suggest for suggestions if not finding help entry [ASH] 
   * dynhelp() and textfile() optionally allow suggestions [ASH]
   * randextract() optionally has weighted values [ASH]
+  * execscript() modified to pass back and forth registers and vars [ASH]
+  * execscript() passes register names as well [ASH]
+  * Added /query to help, +help, @dynhelp (but not functions) [ASH]
+  * Added /reset switch to @txlevel and @rxlevel to force a clearing
+    of the reality prior to any new sets [ASH]
+  * atrperms_checkall to go through all prefix matching for the lowest
+    permission match [ASH]
+  * added NETMASK support to @blacklist [ASH]
+  * stderr() will convert output starting with #-1 to notify() and remove
+    from the stack. [ASH]
   
   Changes
   ------------
   * help allows suggestions when it can not find help entry [ASH]
   * listprotection() has additional arguments to handle @alias [ASH]
+  * Added comments and continous lines to content for execscript [ASH]
+  * Added MUTT compatibility to autoreg mail handling [ASH]
+  * Reality levels with @txlevel/@rxlevel allow setting by bitmask [ASH]
+  * @rxlevel/@txlevel follow NOISY @toggle parameters [ASH]
+  * Options to pemit(), remit(), and zemit() to disable multi-parsing and ## 
+    evaluation [ASH]
+  * sending kill -HUP (SIGHUP) to the main mush process will now
+    not only sync the database but issue a flatfile dump in the
+    form netrhost.SIGHUP.flat [ASH]
+  * All l*() math functions will return '0' now if fed empty lists [ASH]
+  * added parameters to caplist()
+  * singletime() now handles eons
   
   Bug Fixes
   ------------
   * door.c could crash if non-player executed @door/push [ASH]
   * help separator bug with /search
   * @tel target= will now give an error message [ASH]
+  * cleanup script for execscript a bit too aggressive [ASH]
+  * @fpose/nospace didn't work properly [ASH]
+  * initializing of unitialized variables for trace [ASH]
+  * trace buffers were insufficiently sized on 32 byte SBUFS [ASH]
+  * cleanup of possible buffer null terminate on SBUF [ASH]
+  * 3rd arg to strmath() wasn't evaluating [ASH]
+  * door only did LF and not CRLF [ASH]
+  * cleanup of an unused variable in functions.c [ASH]
+  * site paranoia was a bit too, well, paranoid [ASH]
+  * some cleanup to @snapshot on making restrictions on filenames [ASH]
+  * mktime64 was defined in IBM so had to be renamed [ASH]
+  * cleanup of DOORS and potential API connections on @reboot [ASH]
+  * @invformat didn't handle parents [ASH]
+  * lattr() with command checking didn't cleanly check commands [ASH]
+
+& 4.0.0p3
+  Release Date: 12/06/18
+  Status: Alpha
+    
+  New Features
+  ------------
+  * queue timer allows specifying offset from 1 second to 1 milisecond [ASH]
+  * Sites that do not properly send AUTH data or RDNS data get auto-added
+    to the NoAUTH and NoDNS entires to avoid future lag [ASH]
+  
+  Changes
+  ------------
+  * @blacklist modified to be more user friendly for display values.
+    Must now specify '0' or 'all' to get a full listing (spammy) [ASH]
+  
+  Bug Fixes
+  ------------

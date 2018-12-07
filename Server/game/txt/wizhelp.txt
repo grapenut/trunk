@@ -1103,6 +1103,8 @@
   
   MAILPROG          -- Defines the mail program used with autoregistration.
                        Default:  elm
+  MAILMUTT          -- Defines if the mail program used is mutt.
+                       Default:  no
   MAILSUB           -- Defines if the mail program used recognizes subjects.
                        Default:  yes
   OFFLINE_REG       -- Enables off-line (ie: connect screen) registration.
@@ -2654,7 +2656,7 @@
  
 & blacklist.txt
 & @blacklist
-  Command: @blacklist[/<switch>]
+  Command: @blacklist[/<switch>] [<argument>]
   
   This command lists, loads, or clears the current blacklists.  Blacklists are
   similiar to forbid sites, except it keeps them in a separate list to avoid
@@ -2666,14 +2668,71 @@
   blacklist.  There is a script that can be ran that will populate this
   file with all known TOR exit points.
   
+  You may optionally have a netmask (in ipv4 or CIDR noation) after the IP
+  in the blacklist.txt.  If no masks is seen, it will assume /32.  
+  
   The following switches exist for @blacklist:
     /load  - Load in all sites in the blacklist.txt file
     /clear - purges the blacklist
-    /list  - lists all sites in the blacklist
+    /list  - lists all sites in the blacklist.  This shows 4 to a line.
+    /mask  - like list but will show the IP and associated NETMASK.  This
+             shows 2 IP's and 2 NETMASK's to a line.
+  
+{ see 'wizhelp @blacklist2' for arguments and examples }
+
+& @blacklist2
+  (CONTINUED)
+  Command: @blacklist[/<switch>] [<argument>]
   
   If no switch is specified, it gives a summary of sites in the blacklist.
   
+  /list and /mask may specify a page value <argument> or the argument 'all'.  
+  If you do not specify a value <argument> it defaults to '1'.  You must 
+  specify '0' or 'all' to get a complete listing.
+  
+  It is STRONGLY suggested you use the paging values with most blacklists 
+  that hold proxies, it could contain tens of thousands of entries.  
+  Using /list or /mask with the '0' or 'all' argument will list ALL sites
+  and can be extremely long and spammy.
+  
+    Examples:
+    > @blacklist/list 1   (shows page 1)
+    > @blacklist/list     (shows page 1)
+    > @blacklist/list all (shows all sites)
+    > @blacklist/list 0   (shows all sites)
+    > @blacklist/mask 20  (shows page 20) 
+    > @blacklist/mask all (shows all sites)
+    > @blacklist/mask 0   (shows all sites)
+  
+  With /list, any entry that has a [M] before the IP signifies that there
+  is a non-standard netmask associated with the IP.  A nonstandard netmask
+  is considered one that is not /32 (255.255.255.255).
+  
+  { 'wizhelp blacklist file' for an example of the blacklist.txt file }
+  
   See Also: forbid_site, @site
+
+& blacklist file
+  Topic: blacklist file contents
+  
+  The blacklist.txt file (which will reside in the game directory) will
+  look like the following as an example:
+  
+     123.123.123.123
+     122.122.122.0 /24
+     122.122.0.0 255.255.0.0
+  
+  If you do not specify a netmask, it will assume 255.255.255.255 (/32) as
+  the netmask.  You may use CIDR notation (ie: /24) or the ipv4 notation
+  instead (ie: 255.255.255.0).  
+  
+  IP and NETMASK needs to be separated by a white space.  This can be
+  one or more spaces and/or one or more tabs.
+  
+  If the IP or netmask is invalid, it will skip the entry.
+  
+  See Also: @site, @blacklist
+  
 & @boot
   Command: @boot[/<switches>] <player>
   
@@ -3032,9 +3091,7 @@
   set up all global functions.  The privileged and preserved, protect, and
   notrace switches may be combined.
    
-  Function definitions may not be removed (aside from shutting down and
-  restarting the RhostMUSH, but they may be redefined so that they point to an
-  unused attribute.  This command may normally only be invoked by player #1.
+  Function definitions may be removed or redefined on the fly.
   
   {see 'wizhelp @function2' for examples}
 
@@ -4208,6 +4265,9 @@
   have.  This can be based on who can SET it, who can SEE it, as well as
   lock that specific mask by owner or by individual object.  Owner and
   object are specified by their dbref#'s.
+  
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
    
   Individual help and examples are available on each attribute prefix switch:
      'wizhelp @aflags perm'    -- help on displaying prefix permissions.
@@ -4217,7 +4277,7 @@
      'wizhelp @aflags args'    -- explains the arguments to @aflags
      'wizhelp @aflags bits'    -- help on the level bits for see/set perms
   
-  See Also: atrperms, atrperms_max
+  See Also: atrperms, atrperms_max, atrperms_checkall
 
 & @aflags bits
   Command: @aflags/mod <prefix> [<own> <tgt>]=<set> <see> [<own> <tgt> <enact>]
@@ -4227,6 +4287,9 @@
   permissions or <set> permissions.  <set> permissions handles setting and 
   UN-setting.
   
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
+   
   The following bits exist for the <set> and <see> parameters:
       0 - Unable to <set/see> if target is a guest or wanderer
       1 - Normal mortal or higher may <set/see>
@@ -4249,6 +4312,9 @@
 & @aflags args
   Command: @aflags/mod <prefix> [<own> <tgt>]=<set> <see> [<own> <tgt> <enact>]
   
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
+   
   The arguments are the following:
     <prefix>   --  The prefix is the attribute prefix that the permissions 
                    masking is applied.  Any attribute that starts with the
@@ -4288,6 +4354,9 @@
   the owner, target, or enactor, set the value to '#-1' which means 'global' 
   or 'all'.
   
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
+   
   Example:  @aflags/mod boogie=6 3
             @aflags/mod boogie #1234 #9876=5 5 #-1 #9876 #-1
   
@@ -4324,6 +4393,9 @@
   
   If there are no matching prefixes, it'll alert you of that fact.
    
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
+   
   See Also: @aflags, @aflags add, @aflags mod, @aflags perm
 
 & @aflags add
@@ -4339,6 +4411,9 @@
   are defined by any entry that matches the prefix, the owner, and 
   the target.  If you wish to modify an entry, use @aflags/mod.
   
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
+   
   Example:  @aflags/add boogie=7 6
             @aflags/add boogie=7 6 #1234 #9876 #123
   
@@ -4356,6 +4431,9 @@
   the results (20 lines per page).  Otherwise it will display all
   the results without page breaks (default).
   
+  Permissions are handled by FIRST MATCH in the array.  To see the order
+  of permissions please check @aflags/list.
+   
   Example:  @aflags/perm
             @aflags/perm 2
 
@@ -4800,26 +4878,27 @@
   image file and the object in question.  The following switches exist:
   
     /list      - Syntax: @snapshot/list  (default)
-                 This lists all image files you currently have to disk.
+                   This lists all image files you currently have to disk.
     /verify    - Syntax: @snapshot/verify <imagefile>
-                 This issues a sanity check on the image file and lets
-                 you know if the file is valid or corrupt.
+                   This issues a sanity check on the image file and lets
+                   you know if the file is valid or corrupt.
     /del       - Syntax: @snapshot/del <imagefile(s)>
-                 This deletes the specified image file(s) from the drive.
-                 You may specify more than one in a space-delimited list.
-    /unload    - Syntax: @snapshot/unload <target> [=<optional prefix>]
-                 This makes a snapshot file of the specified target and
-                 creates an optional prefix name for it.  Default name
-                 will be the dbref#.  '123.img' for example.
+                   This deletes the specified image file(s) from the drive.
+                   You may specify more than one in a space-delimited list.
+    /unload    - Syntax: @snapshot/unload <target> [=<optional suffix>]
+                   This makes a snapshot file of the specified target and
+                   creates an optional suffix name for it.  Default name
+                   will be the dbref#.  '123.img' for example.  The new
+                   name will be 123_<suffix>.img.
     /unall     - Syntax: @snapshot/unall <list of targets>
-                 This works like /unload but takes a list of targets.
-                 You can not specify a destination name with this arg.
+                   This works like /unload but takes a list of targets.
+                   You can not specify a destination name with this arg.
     /load      - Syntax: @snapshot/load <target> = <imagefile>
-                 This will load the image file onto the specified object.
-                 The object types MUST be the same, the object MUST be
-                 a valid object, and some things (like location) will
-                 be skipped on the restore.  Parents and Zones will be
-                 set if validated.
+                   This will load the image file onto the specified object.
+                   The object types MUST be the same, the object MUST be
+                   a valid object, and some things (like location) will
+                   be skipped on the restore.  Parents and Zones will be
+                   set if validated.
     /overwrite - when specified with /unload or /unall will allow
                  overwriting the target file.
   
@@ -4841,8 +4920,8 @@
   changes override the current default settings and are only good for
   the current boot of the machine (i.e.  Cleared on @shutdowns and @reboots).
   
-  The @toggledef handles all TOGGLES.
-  The @flagdef handlds all FLAGS. 
+  The @toggledef handles all TOGGLES.  (help @toggledef4 for options)
+  The @flagdef handlds all FLAGS.      (help @flagdef4 for options)
   
   The following switches exist for this command.
     /set    - This sets permissions of who can SET the flag.
@@ -4897,8 +4976,12 @@
   
   If you wish to remove a permission, you can use '!permission' to unset a
   given permission.  You may specify multiple permissions to set and remove at
-  the same time.  (i.e.  @flagdef/set marker0=god immortal !royalty mortal)
- 
+  the same time.  
+  
+  Examples:
+    InGame command -> @flagdef/set marker0=!god !immortal !royalty mortal
+    netrhost.conf  -> flag_access_set marker0 !god !immortal !royalty mortal 
+  
   { see 'wizhelp @flagdef3' for a list of available type restrictions }
   { see 'wizhelp @flagdef4' for a list of all @admin related parameters }
 
@@ -4926,8 +5009,12 @@
    
   If you wish to remove a permission, you can use '!permission' to unset a
   given permission.  You may specify multiple permissions to set and remove at
-  the same time.  (i.e.  @flagdef/type marker0=immortal !royalty room)
-
+  the same time.  
+  
+  Examples: 
+    InGame command -> @flagdef/type marker0=immortal !royalty room
+    netrhost.conf  -> flag_access_type marker0 immortal !royalty room
+  
   {see 'wizhelp @flagdef4' for a list of all @admin related parameters}
   
   See Also: @flag, @flagdef, @toggledef
@@ -5058,9 +5145,12 @@
   files you wish to read.  Use a '^' to specify sub-directories.  '.' is not
   valid as part of the filename (or path).
   
+  Note: For /search and /query you must have wildcards for patterns.
+  
   Available switches:
     /parse   - this will parse the help evaluating all %n's/functions.
     /search  - search content and list topics containing '<topic>'.
+    /query   - like /search, but gives details on matching lines of '<topic>'
     /nolabel - snuff the hilight index of the topic <topic> when showing.
   
   Example:
@@ -5806,26 +5896,26 @@
   alt_inventories          altover_inv              always_blind           
   ansi_default             ansi_textfiles           api_nodns
   api_port                 areg_file                areg_lim               
-  aregh_file               atrperms                 atrperms_max           
-  attr_access              attr_alias               attr_cmd_access        
-  authenticate             bad_name                 badsite_file           
-  bcc_hidden               blind_snuffs_cons        brace_compatibility    
-  break_compatability      cache_depth              cache_steal_dirty      
-  cache_trim               cache_width              cap_articles           
-  cap_conjunctions         cap_preposition          check_interval         
-  check_offset             clone_copies_cost        cluster_cap            
-  clusterfunc_cap          comcost                  command_dark           
-  command_quota_increment  command_quota_max        compress_program       
-  compression              config_access            conn_timeout           
-  connect_file             connect_reg_file         cpu_secure_lvl         
-  cpuintervalchk           cputimechk               crash_database         
-  create_max_cost          create_min_cost          dark_sleepers          
-  default_home             delim_null               descs_are_local        
-  dig_cost                 door_file                door_index             
-  down_file                down_motd_message        dump_interval          
-  dump_message             dump_offset              earn_limit             
-  empower_fulltel          enable_tstamps           enforce_unfindable     
-  enhanced_convtime        error_file 
+  aregh_file               atrperms                 atrperms_checkall
+  atrperms_max             attr_access              attr_alias             
+  attr_cmd_access          authenticate             bad_name               
+  badsite_file             bcc_hidden               blind_snuffs_cons      
+  brace_compatibility      break_compatability      cache_depth            
+  cache_steal_dirty        cache_trim               cache_width            
+  cap_articles             cap_conjunctions         cap_preposition        
+  check_interval           check_offset             clone_copies_cost      
+  cluster_cap              clusterfunc_cap          comcost                
+  command_dark             command_quota_increment  command_quota_max      
+  compress_program         compression              config_access          
+  conn_timeout             connect_file             connect_reg_file       
+  cpu_secure_lvl           cpuintervalchk           cputimechk             
+  crash_database           create_max_cost          create_min_cost        
+  dark_sleepers            default_home             delim_null             
+  descs_are_local          dig_cost                 door_file              
+  door_index               down_file                down_motd_message      
+  dump_interval            dump_message             dump_offset            
+  earn_limit               empower_fulltel          enable_tstamps         
+  enforce_unfindable       enhanced_convtime        error_file 
   
 { 'wizhelp config parameters2' for more }
 { 'wizhelp config parameters reality' for more (reality levels) }
@@ -5885,12 +5975,12 @@
   mail_autodeltime         mail_default             mail_def_object        
   mail_hidden              mail_tolist              mail_verbosity         
   mailbox_size             maildelete               mailinclude_file       
-  mailprog                 mailsub                  mailmax_send          
-  master_room              match_own_commands       manlog_file            
-  map_delim_space          max_cpu_cycles           max_dest_limit         
-  max_folders              max_lastsite_api         max_lastsite_cnt       
-  max_name_protect         max_pcreate_lim          max_pcreate_time       
-  max_percentsubs          max_players
+  mailmutt                 mailprog                 mailsub                
+  mailmax_send             master_room              match_own_commands     
+  manlog_file              map_delim_space          max_cpu_cycles         
+  max_dest_limit           max_folders              max_lastsite_api       
+  max_lastsite_cnt         max_name_protect         max_pcreate_lim        
+  max_pcreate_time         max_percentsubs          max_players
   
 { 'wizhelp config parameters4' for more }
 
@@ -5901,28 +5991,29 @@
   min_con_attempt          money_lim_off             money_lim_gm
   money_lim_arch           money_lim_counc           money_name_plural
   money_name_singular      motd_file                 motd_message
-  mud_name                 muddb_name                must_unlquota
-  mux_child_compat         mus_lcon_compat           name_with_desc
-  nand_compat              newpass_god               news_file
-  news_index               newuser_file              no_startup
-  noauth_site              noautoreg_host            noautoreg_site
-  nobroadcast_host         noguest_host              noguest_site
-  nodns_site               nonindxtxt_maxlines       noregist_onwho
-  noshell_prog             nospam_connect            notify_recursion_limit
-  notonerr_return          null_is_idle              num_guests             
-  oattr_enable_altname     oattr_uses_altname        objid_localtime        
-  objid_offset             offline_reg               old_elist              
-  online_reg               open_cost                 output_database        
-  output_limit             page_cost                 paranoid_allocate      
-  paranoid_exit_linking    parent_follow             parentable_control_lock
-  partial_conn             partial_deconn            passapi_host
-  passapi_site             passproxy_host            passproxy_site         
-  paycheck                 pcreate_paranoia          pemit_any_object       
-  pemit_far_players        penn_playercmds           penn_setq              
-  penn_switches            permit_site               player_attr_default    
-  player_dark              player_flags              player_listen          
-  player_match_commands    player_match_own_command  player_name_spaces     
-  player_parent            player_queue_limit        player_quota           
+  mtimer                   mud_name                  muddb_name              
+  must_unlquota            mux_child_compat          mux_lcon_compat 
+  name_with_desc           nand_compat               newpass_god             
+  news_file                news_index                newuser_file            
+  no_startup               noauth_site               noautoreg_host          
+  noautoreg_site           nobroadcast_host          noguest_host            
+  noguest_site             nodns_site                nonindxtxt_maxlines     
+  noregist_onwho           noshell_prog              nospam_connect          
+  notify_recursion_limit   notonerr_return           null_is_idle            
+  num_guests               oattr_enable_altname      oattr_uses_altname      
+  objid_localtime          objid_offset              offline_reg             
+  old_elist                online_reg                open_cost               
+  output_database          output_limit              page_cost               
+  paranoid_allocate        paranoid_exit_linking     parent_follow           
+  parentable_control_lock  partial_conn              partial_deconn          
+  passapi_host             passapi_site              passproxy_host          
+  passproxy_site           paycheck                  pcreate_paranoia        
+  pemit_any_object         pemit_far_players         penn_playercmds         
+  penn_setq                penn_switches             permit_site             
+  player_attr_default      player_dark               player_flags            
+  player_listen            player_match_commands     player_match_own_command
+  player_name_spaces       player_parent             player_queue_limit      
+  player_quota           
   
 { 'wizhelp config parameters5' for more }
 
@@ -6290,8 +6381,21 @@
   Note #3: When you delete an attribute, you do not need to specify bitmasks.
   Note #4: Specify owner and/or target if you want a specific duplicate prefix.
   
-  See Also: atrperms_max, @aflags
+  See Also: atrperms_max, atrperms_checkall, @aflags
 
+& atrperms_checkall
+  Config parameter: atrperms_checkall <boolean>   Default: 0
+  
+  This will enable checking all @aflag restricted attribute prefixes for any
+  attribute read or set.  This could potentially be costly depending on the
+  number of attributes flags you use.
+  
+  This will use the lowest matching permission for the attribute.
+  
+  Without this enabled, it will take them in order of when they were set.
+  This order can be seen with the @aflags command.
+  
+  See Also: atrperms_max, atrperms, @aflags
 & atrperms_max
   Config Parameter: atrperms_max <value>    Default: 100
   
@@ -8627,6 +8731,23 @@
   @listmotd command.
   See Also: @listmotd, @motd, motd_file.
 
+& mtimer
+  Config parameter: mtimer <value>.  Default: 10 (miliseconds)
+  
+  This specifies the queue interval that you wish to have for the timer
+  for each queue slice.  The default is 10 miliseconds.  You may specify
+  a multiple of 10 starting at '1' for 1 second up to 1000 for 1 milisecond.
+  
+  So valid values are: 1, 10, 100, 1000.
+  
+  Specifying an invalid value will revert to the previous value.
+  
+  Rhost's default is 10 miliseconds.
+  MUX2's default is 10 miliseconds.
+  PennMUSH and TinyMUSH3's default is 1 second.
+  
+  See Also: @ps, pid()
+ 
 & mud_name
   Config parameter: mud_name <string>.  Default: RhostMUSH
   
@@ -9710,7 +9831,7 @@
   @wipe from working on that specific target that has either of those flags.
 
 & safer_ufun
-  Config parameter: safer_ufun <yes/no>.  Default: o
+  Config parameter: safer_ufun <yes/no>.  Default: no
   
   If this is enabled, then any attribute that is evaluated on something that
   you do not control will be evaluated either at your level or the object
@@ -11062,14 +11183,19 @@
   directory's sub-directory 'scripts'.  It is case sensitive and strips
   illegal characters (like, .., /, $, etc) from the script name.
   
-  This requires the EXECSCRIPT @power of GUILDMASTER to use the function.
-  It requires the ARCHITECT level to allow the use of passing arguments
-  to the script.  Unlike other powers, this power is not inheritable.
+  MUSH Requirements:
+     - @power of EXECSCRIPT (guildmaster to use, arch+ to pass vars)
+     - SIDEFX flag
+     - EXECSCRIPT_VARS (optional)  --> passed as enviornment var MUSHL_VARS
+       This is set on the thing with execscript() on it to define what
+       variables it has that will be passed as MUSHV_<args> to the script
+  
+  Note: The EXECSCRIPT @power is not inheritable.
   
   You can pass a maximum of 9 arguments to the script not including the
-  script name.
+  script name.  It combines all arguments into a singular argument to script.
   
-  The following variables are available from inside the scripts called:
+  The following global variables are available from inside the scripts called:
     MUSH_PLAYER       - [%!] dbref# of player followed by name of player.  
     MUSH_CAUSE        - [%#] dbref# of cause followed by name of cause.  
     MUSH_CALLER       - [%@] dbref# of caller followed by name of caller.  
@@ -11078,6 +11204,15 @@
     MUSH_OWNER        - dbref# of player's owner by name of owner.
     MUSH_OWNERFLAGS   - the flags of the player's owner.
     MUSH_OWNERTOGGLES - the toggles of the player's owner.
+    MUSHL_VARS        - All the variables you want the script to see which
+                        is passed as the mush attribute EXECSCRIPT_VARS
+                        on the container that is executing execscript()
+    MUSHV_<arg>       - Dynamic variables passed from above EXECSCRIPT_VARS
+    MUSHQ_<arg>       - SetQ registers (0-9 and a-z) 
+    MUSHQN_<arg>      - Label names of registers (0-9 and a-z)
+    MUSHN_<arg>       - Register name contents of the setq register.
+                        Note: setq 0 label of 'bob' will have MUSHQ_0 and
+                              MUSHN_BOB have the same contents.
   
   Examples:
     > say execscript(hello.sh)
@@ -11086,8 +11221,152 @@
     You say "hello from the script with args: 'test'"
   
   See 'writing scripts' for help on dos and don'ts in writing execscripts.
+  See 'working with execscript' to use registers and variables and callbacks.
+
     
   See Also: POWER EXECSCRIPT, exec_secure
+
+& WORKING WITH EXECSCRIPT
+  Topic: Working with Execscript
+  
+  The file that will be passed back to the mush is the name of the 
+  executing script with '.set' after it.  With the example 'myscript.sh'
+  the loader file will be 'myscript.sh.set'.
+ 
+  Note1: you may start lines with a '#' for comments.
+  Note2: you may continue content by ending previous line with a <ctrl>M
+         (which is a line feed)
+  Note3: A maximum of 1000 lines are read (including comments)
+  
+  The file loader after the execscript is executed is the name of the
+  script plus '.set' after it.  So if execscript called myscript.sh then
+  the loader script it calls after execution is myscript.sh.set.  This file
+  will be not be triggered if it detects the file existing prior to 
+  the executing of the script.  This is a safty margin.
+  
+  The following registers are passed to the script as environment variables:
+    MUSHQ_<reg>   - Where <reg> is 0-9 or a-z for the SETQ registers.
+    MUSHQN_<reg>  - The label name of the <reg> defined above.
+    MUSHN_<label> - The label contents of the named register.
+  
+  The following variables are passed to the script as environment variables:
+    MUSHL_VARS    - This is the contents of the EXECSCRIPT_VARS mush attribute
+                    that has a space seperated list of attribute names you
+                    wish to pass to the script.
+    MUSHV_<arg>   - Each <arg> is a mush attribute variable from MUSHL_VARS.
+  
+{ see 'working with execscript2' for details and examples }
+
+& WORKING WITH EXECSCRIPT2
+  Topic: Working with Execscript Part 2
+  
+  The list of variables you wish to pass will be from the object issuing
+  the execscript (not the executor, but the container) as a space separated 
+  list stored in the variable EXECSCRIPT_VARS.  Let's assume the execscript
+  is on object #123
+  
+  Example: 
+    > @set #123=SIDEFX INHERIT
+    > @power/counc #123=EXECSCRIPT
+    > &EXECSCRIPT_VARS #123=foo bar baz
+    > &FOO #123=This is my foo variable
+    > &BAR #123=This is my bar variable
+    > &BAZ #123=This is my baz variable
+    > &EXEC_ONE #123=$run1:@pemit %#=[execscript(hi.sh)]
+    > &EXEC_TWO #123=$run2 *:@pemit %#=[setq(0,foo,bar)][execscript(hi.sh,%0)]
+  
+  The EXECSCRIPT_VARS contents as passed as environment variable MUSHL_VARS.
+  This will always be a space delimited list of variables you want your script
+  to see.  The contents of the example is 'foo bar baz' which are then defined
+  as the environment variables with contents:
+     environment MUSHV_FOO containing 'This is my foo variable' from &FOO
+     environment MUSHV_BAR containing 'This is my bar variable' from &BAR
+     environment MUSHV_BAZ containing 'This is my baz variable' from &BAZ
+  
+  All registers that are defined are allocated and defined as environments
+  with labels if declared.  It only assigns registers and labels where defined.
+     environment variable MUSHQ_0 containing 'foo' from setq 0 contents
+     environment variable MUSHQN_0 containing 'bar' from setq 0 label
+     environment variable MUSHN_BAR containing 'foo' from setq 0 contents
+  
+  Notice the difference between 'run1' and 'run2' above is that run1 just
+  execs the script.  No registers are passed, but EXECSCRIPT_VARS passes
+  three variables that will be seen by your script.  'run2' in addition
+  passes argument 0 (%0) to the script, as well as sets a register and
+  label.
+  
+  At the end of the execscript() the mush does house keeping and
+  will remove all environment variables that were originally set.
+  
+{ See 'working with execscript3' for passing information back into the mush}
+  
+& WORKING WITH EXECSCRIPT3
+  Topic: Working with Execscript Part 3
+  
+  If you wish to have variables and registers pushed back to the mush,
+  you must stage a file to be read at the end of your script execution.
+  
+  The filename created will be <scriptname>.set.  This file will be removed
+  after the end of processing. 
+  
+  Yes yes, I know, this isn't exactly clean, but it's one of the few
+  'clean' ways a child can refer back to the parent short of writing
+  complex (and not fully platform supported) shared memory.  We took
+  the easy way out here.
+  
+  The file that will be read is the name of the script execscript() called
+  with a '.set' appended to it.  
+  
+  So if your script was called 'myscript.sh'.  The file it would read
+  in would be called 'myscript.sh.set'.  Again, this file is removed after
+  it runs.  
+  
+  The syntax of this file will be as follows.
+  
+  To set registers back to the mush you would use:
+    <register> Q      -- This clears the register
+    <register> Q bob  -- This sets the register to contents 'bob'
+    <label>    QN boo -- This sets register with label' <label> 'boo'
+  
+  To set variables back to the mush you would use:
+    <variable> <dbref#>      -- This clears the attribute on dbref#
+    <variable> <dbref#> bob  -- This sets 'bob' to the attribute
+  
+{ see 'working with execscript4' for examples and descriptions }
+
+& WORKING WITH EXECSCRIPT4
+  Topic: Working with Execscript Part 4
+  
+  To continue, you again would still be using the .set file.  For
+  the example we were using 'myscript.sh.set' because the example
+  execscript() was myscript.sh.
+  
+  Example <script>.set file contents:
+     W Q
+     0 Q Setting Register 0
+     A Q Setting register A
+     snork QN Setting register with label snork 
+     BOB #456 This is my BOB attribute
+     SEX #123 Male
+     DESC #123 This is my desc%r%rI like my %crred%cn desc.
+     MULTILINE #123 Multi Line Input^M
+     More for the line^M
+     And the end
+     WIPEATTR #123
+   
+  To describe what the examples do: 
+     W Q  -- this clears register W
+     0 Q <string> -- This sets <string> into register 0 (%q0)
+     A Q <string> -- This sets <String> into register A (%qa)
+     snork QN <string> -- sets string to register with label 'snork'
+     BOB #456 <string> -- Same as &BOB #456=<string>
+     SEX #123 <string> -- Same as @sex #123=<string>
+     DESC #123 <string> -- Same as @desc #123=<string>
+     MULTILINE #123 <string> -- Each ^M says to keep reading
+                                until no ^M or end of file
+     WIPEATTR #123 -- same as &WIPEATTR #123 or @wipe #123/WIPEATTR
+  
+  See also: execscript(), WRITING SCRIPTS, POWER EXECSCRIPT
 
 & WRITING SCRIPTS
   Topic: Writing Scripts
@@ -11298,16 +11577,26 @@
   Function: ishidden(<player>)
   
   Returns a TRUE(1) if the given player is set UNFINDABLE.
-
-& DYNHELP()
-  Function: dynhelp(<helpfile>,<topic>[[,<target player>],<parsekey>])
   
-  This function will read the matching 'helpfile.txt' file, search
-  the 'helpfile.indx' for the topic, and return to the enactor
-  (or targetted player), the result.  If you specify a parsekey of
-  '1' (or true), it will parse the help file.  A '2' will issue content
-  searches.  Keep in mind that as a function, this will strip ansi codes.
-  If you want to display ansi codes in .txt files and parse it, use @dynhelp.
+  Example:
+    > say ishidden(#1)
+    You say "1" 
+  
+& DYNHELP()
+  Function: dynhelp(<helpfile>,<topic>[[[,<target>],<parsekey>],<suggest>])
+  
+  This function will read the matching <helpfile> file (such as help.txt), 
+  search the indx file (such as help.indx) for the topic, and return to the 
+  enactor (or target player), the result.  You may use any help file that 
+  has a matching .indx file.  
+  
+  If you specify a <parsekey> of '1' (or true), it will parse the help 
+  file.  A '2' will issue content searches.  Keep in mind that as a 
+  function, this will strip ansi codes.  If you want to display ansi 
+  codes in .txt files and parse it, use @dynhelp.  
+  
+  The <suggest> option enables suggestions if the help topic is not found.
+   
   You may specify either '/' or '^' here for path information.
   
   This function does NOT return the output into a buffer.  This is a
@@ -11325,17 +11614,17 @@
   See Also: @dynhelp, textfile()
 
 & TEXTFILE()
-  Function: textfile(<helpfile>,<topic>[,<parsekey>[,<type>[<sep>]]])
+  Function: textfile(<helpfile>,<topic>[,<parsekey>[,<type>[,<sep>[,<sug>]]]])
+  
+  This function was coded to provide Penn and MUX2 compatibility.
   
   This function works similarilly to dynhelp(), except that the resulting
   string is returned to the controlling command and not as a side-effect.
   This is a possible limitation as the string that it returns has to be
   limited to an LBUF in size, or it will be cut off.
   
-  You may specify a parsekey of '1' to let textfile() know that it needs 
+  You may specify a <parsekey> of '1' to let textfile() know that it needs 
   to parse the input and evaluate it.  A '2' will enable content searches.
-  
-  This function was coded to provide Penn and MUX2 compatibility.
   
   You may specify a <type> of '1' if you wish the function to return the
   wildcarded list of matches without the standard help entry header of
@@ -11344,6 +11633,9 @@
   You may specify a separate separator <sep> to be used for returned
   arguments for matches.  It will default to two spaces.
   
+  The optional <sug> is for suggestion enabling.  Enabling this will have
+  it return suggestions if a lookup doesn't match.
+   
   Example:
     > think textfile(help,mail)
     (returns the 'mail' topic in the help file)
@@ -11861,18 +12153,32 @@
   
   See Also: size(), msizetot()
 
+& mailmutt
+  Config parameter: mailmutt <yes/no>.  Default: NO
+  
+  Specifies if the mail program being used is MUTT.
+  This is required to add an additional parameter to the email program.
+  
+  See Also: mailsub, mailprog
+
 & mailprog
   Config parameter: mailprog <string>.  Default: elm
+  
   Specifies the mail program used to send autoregistration email.
-  See Also: mailsub
+  
+  See Also: mailsub, mailmutt
 
 & mailsub
   Config parameter: mailsub <yes/no>.  Default:  YES
+  
   Specifies if a '-s' is used with the mailprogram defined by 'mailprog'
   config parameter.  The '-s' would be the subject line.
+  
+  See Also: mailmutt, mailprog
 
 & mail_anonymous
   Config parameter: mail_anonymous <string>.  Default: *Anonymous*
+  
   Defines the 'anonymous' name seen when a player reads/stats/other a
   mail that was sent anonymously.
   
@@ -11880,6 +12186,7 @@
 
 & mail_autodeltime
   Config parameter: mail_autodeltime <days>.  Default: 21
+  
   Specifies the time, in days, that mail is auto-purged from non-wizards.
   This does effect councilors and lower.
   
@@ -11887,6 +12194,7 @@
 
 & mail_def_object
   Config parameter: mail_def_object <dbref>.  Default: -1
+  
   Specifies the dbref# (without the '#') of the object that houses the
   global dymamic mail aliases.  Global dynamic mail aliases are literally
   functions that return a list of dbref#.  The syntax would be:
@@ -11901,12 +12209,14 @@
   
 & mail_hidden
   Config parameter: mail_hidden <on/off>.  Default: off
+  
   Specifies if mail/anon will hide who the message was originally sent
   to.  Like the /anon switch itself, WIZARD and higher can see through
   hidden/anonymous names to the real sender behind it.
   
 & mail_tolist
   Config parameter: mail_tolist <yes/no>.  Default: NO
+  
   Specifies if the To: list in mail is automatically added in any sent
   mail, showing everyone who the mail want sent to.  If this is enabled,
   using '@' when sending mail will do the reverse of what it says and
@@ -11914,6 +12224,7 @@
 
 & mail_verbosity
   Config parameter: mail_verbosity <yes/no>.  Default: NO
+  
   Specifies if subjects are displayed with the 'You have new mail' message
   that a player receives, as well if players receive this message even
   if they're disconnected.  This is tied in as both have to do with
@@ -11923,11 +12234,14 @@
 
 & mail_default
   Config parameter: mail_default <yes/no>.  Default: NO
+  
   Specifies if 'mail' will return 'mail/status' instead of the default
   of 'mail/quick'.  This is done for backward compatibility to other
   mail systems.
 
 & CLOAKING
+  Topic: CLOAKING
+  
   Cloaking on RhostMUSH is unique from other server types.  If you happen
   to be bitlevel 5 or higher (ROYALTY (wizard) or IMMORTAL (super-royalty))
   and set both the UNFINDABLE and DARK flags, you are considered WIZCLOAKED.
@@ -11948,6 +12262,8 @@
   the appropiate @admin parameters)
 
 & ALT INVENTORIES
+  Topic: ALT INVENTORIES
+  
   RhostMUSH allows alternate inventory types.  They are pretty robust with
   what they allow.  To successfully set up alternate inventories, the
   following are used for configuration.
@@ -11974,6 +12290,8 @@
   { type 'wizhelp alt inventories2' for step-by-step examples to configure }
 
 & ALT INVENTORIES2
+  Topic: ALT INVENTORIES
+  
   Alternate Inventories - A tutorial...
   [ Ok, let's first enable alternate inventories, worn, and wielded. ]
     > @admin alt_inventories=1
@@ -12025,6 +12343,8 @@
   See Also: wizhelp wmail alias, help mail alias
 
 & guest setup
+  Topic: GUEST SETUP
+  
   Setting up guests is relatively simple.  You have to do the following 
   things in order, however.
   
@@ -12051,6 +12371,7 @@
 
 & mailinclude_file
   Config parameter: mailinclude_file <string>  (Default 'autoreg_include.txt')
+  
   Specifies the text file that is included when someone autoregisters.  If
   no text file is found, or the file is invalid, it sends the base information
   to the user (login, password, and who it's from).
@@ -12058,6 +12379,8 @@
   Note: this has some protection and requires the file end in '.txt'.
 
 & news setup
+  Topic: NEWS SETUP
+  
   The news.txt file (and help.txt file) uses a unique index system for 
   references.  You design the file with a '&' to start an index key and the
   text after it is the content of that topic.  The main topic is *ALWAYS* 
@@ -12067,6 +12390,8 @@
 { For help on how to set one up, please see:  'wizhelp news setup2' }
   
 & news setup2
+  Topic: NEWS SETUP
+  
   This is an example of how a news.txt file will look like:
   
     & help
@@ -12098,6 +12423,8 @@
 { wizhelp news setup3 to continue }
 
 & news setup3
+  Topic: NEWS SETUP
+  
   Once the .txt file is finished, you need to create the index for the text
   file.  To do this, from within the txt directory you would type 
   the following:
@@ -12120,22 +12447,30 @@
   wizhelp.txt, error.txt, and all other text files.
  
 & help setup
+  Topic: HELP SETUP
+  
   The help.txt file is set up like the news.txt file.  To see how this file
   is designed and updated, please refer to 'wizhelp news setup'.
   
   See Also: news setup
 
 & plushelp setup
+  Topic: PLUSHELP SETUP
+  
   The plushelp.txt file is set up like the news.txt file.  To see how this
   file is designed and updated, please refer to 'wizhelp news setup'.
 
 & elsefile setup
+  Topic: ELSEFILE SETUP
+  
   You may set up ANY file to be read from within the mush by using the
   @dynhelp command or dynhelp() function.  The only stipulation to this
   is that the file MUST end in '.txt' and the file MUST have a matching
   '.indx' at the same location.
 
 & hook setup
+  Topic: HOOK SETUP
+  
   Hooks are set up by following the shown methods.
   1)  You must first create and setup a hook object to store the data.
       Once you have @created the object, the object needs to be defined
@@ -12173,6 +12508,8 @@
 { see 'wizhelp hook setup2' for examples }
 
 & hook setup2
+  Topic: HOOK SETUP 
+  
   > @create HookObject
   HookObject created as object #1234
   > @admin hook_obj=1234             (and/or in netrhost.conf: hook_obj 1234)
@@ -12208,6 +12545,8 @@
 { see 'wizhelp hook setup3' for special situations }
   
 & hook setup3
+  Topic: HOOK SETUP
+  
   Special commands like ':' for pose, and '"' for say are handled specially.
   The following are issued with @hook or hook_cmd:
   
@@ -12239,6 +12578,8 @@
   See Also: hook_obj, hook_cmd, hook setup
 
 & huh setup
+  Topic: HUH SETUP
+  
   The error.txt file is used to define what a player can see when they
   type a non-existant command. (and get the Huh? (Type 'help' for help).
   This allows you to randomize the messages a player can get.
@@ -12254,7 +12595,7 @@
   if the 'wiz_override' admin param is enabled, this toggle is disregarded.
   
 & @rxlevel
-  Command: @rxlevel <target>=<list>
+  Command: @rxlevel[/<switch>] <target>=[<list>]
   
   Sets or clears the Rx levels for the target. If a level name in list is
   prefixed with !, then the level is cleared.
@@ -12262,16 +12603,26 @@
   The @rxlevel is used for RECEIVING reality levels.  It determines what
   the target can see/hear/interact with.
   
+  You may use the following switches:
+    /reset -- will reset (clear) the reality.  Using this switch you do not 
+              have to specify <list>.  <list> will be applied after
+              clearing.
+  
   Example: @rxlevel *Joe=!Real Umbra
 
 & @txlevel
-  Command: @txlevel <target>=<list>
+  Command: @txlevel[/<switch>] <target>=[<list>]
   
   Sets or clears the Tx levels for the target. If a level name in list is
   prefixed with !, then the level is cleared.
   
   The @txlevel is used for TRANSMITTING reality levels.  It determines what
   things outside of the target can see/hear/interact on.
+  
+  You may use the following switches:
+    /reset -- will reset the reality.  Using this switch you do not have
+              to specify <list>.  <list> will be applied after
+              clearing.
   
   Example: @txlevel *Joe=Real !Umbra
 

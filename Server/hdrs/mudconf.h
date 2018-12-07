@@ -97,6 +97,7 @@ struct confdata {
 	char	postdump_msg[128];  /* Message displayed after @dump-ing */
         char  spam_msg[128];    /* Message displayed when spammonitor kicks in */
         char  spam_objmsg[128]; /* Message displayed when object spammonitor kicks in */
+	int	mailmutt;	/* Is MUTT the mail prorgram of choice */
 	int	whereis_notify;
 	int	max_size;
 	int	name_spaces;	/* allow player names to have spaces */
@@ -405,6 +406,7 @@ struct confdata {
 	char	cap_preposition[LBUF_SIZE];	/* caplist exceptions */
         char    atrperms[LBUF_SIZE];
         int	atrperms_max;
+        int	atrperms_checkall;	/* Go through and check all @aflag perms -- can be expensive if enabled */
         int	safer_ufun;
 	int	includenest;	/* Max number of nesting of @include */
 	int	includecnt;	/* Total number of @includes in the command caller */
@@ -471,6 +473,7 @@ struct confdata {
 	int 	allow_fancy_quotes; /* Allow Unicode 'fancy' quotes or replace them with standard ascii quotes */
 	int 	allow_fullwidth_colon; /* Allow unicode fullwidth colon or replace it with ascii colon */
 	int	posesay_funct;	/* Enable function evaluaton to pose/say fluffing */
+	int	mtimer;		/* The milisecond timer offset range (default 10) */
 #else
 	int	paylimit;	/* getting money gets hard over this much */
 	int	digcost;	/* cost of @dig command */
@@ -819,6 +822,7 @@ struct statedata {
 	int	trace_indent;	/* Trace indention */
 	int	mail_inline;	/* Do not let mail work inline other mail */
         int	iter_special;	/* Special iter handler for 'inf' args */
+	int	nested_control;	/* Nested controlock */
 #else
   dbref remote; /* Remote location for @remote */
   dbref remotep;/* Remote location for @remote player */

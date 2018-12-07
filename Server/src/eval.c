@@ -120,7 +120,7 @@ sub_override_process(int i_include, char *s_include, char *s_chr, char *buff, ch
 
    if ( Good_obj(mudconf.hook_obj) && (mudconf.sub_override & i_include) && !(mudstate.sub_overridestate & i_include) ) {
       s_buf = alloc_sbuf("sub_override_process");
-      sprintf(s_buf, "SUB_%s", s_chr);
+      sprintf(s_buf, "SUB_%.27s", s_chr);
       sub_ap = atr_str_exec(s_buf);
       if ( !sub_ap ) {
          safe_str(s_include, buff, bufc);
@@ -500,7 +500,7 @@ tcache_add(dbref player, char *orig, char *result, char *s_label)
     if (strcmp(orig, result)) {
 	tcache_count++;
 	if (tcache_count <= mudconf.trace_limit) {
-	    xp = (TCENT *) alloc_sbuf("tcache_add.sbuf");
+	    xp = (TCENT *) alloc_mbuf("tcache_add.sbuf");
 	    tp = alloc_lbuf("tcache_add.lbuf");
 	    strcpy(tp, result);
             xp->player = player;
@@ -512,11 +512,13 @@ tcache_add(dbref player, char *orig, char *result, char *s_label)
 	    tcache_head = xp;
 	} else {
 	    free_lbuf(orig);
-            free_sbuf(s_label);
+            if( s_label ) 
+               free_sbuf(s_label);
 	}
     } else {
 	free_lbuf(orig);
-        free_sbuf(s_label);
+        if ( s_label )
+           free_sbuf(s_label);
     }
     DPOP; /* #65 */
 }
@@ -529,7 +531,7 @@ tcache_finish(void)
          *tstr, *tstr2, *s_grep;
     int i_apflags, i_targetlist, i_tabspace;
 #ifdef PCRE_EXEC
-    char *trace_buffptr, *trace_array[4], *trace_tmp;
+    char *trace_buffptr, *trace_array[4], *trace_tmp, *s_xorigbuff;
     int i_trace;
 #endif
     dbref i_apowner, passtarget, targetlist[LBUF_SIZE], i;
@@ -543,6 +545,7 @@ tcache_finish(void)
 
     tprp_buff = tpr_buff = alloc_lbuf("tcache_finish");
     tbuff = alloc_lbuf("bounce_on_notify_exec");
+    s_xorigbuff = alloc_lbuf("xorig_buffer");
     while (tcache_head != NULL) {
 	xp = tcache_head;
 	tcache_head = xp->next;
@@ -551,6 +554,7 @@ tcache_finish(void)
         if ( ap_log ) {
            s_grep = atr_get(xp->player, ap_log->number, &i_apowner, &i_apflags);
            if ( s_grep && *s_grep ) {
+              sprintf(s_xorigbuff, "%.*s", (LBUF_SIZE-1), xp->orig);
 #ifdef PCRE_EXEC
               if ( (i_apflags & AF_REGEXP) || (ap_log->flags & AF_REGEXP) ) {
                  trace_buffptr = tstr2 = alloc_lbuf("grep_regexp");
@@ -560,7 +564,7 @@ tcache_finish(void)
 #else
                  sprintf(trace_tmp, "%s$0%s", ANSI_RED, ANSI_NORMAL);
 #endif
-                 trace_array[0] = xp->orig;
+                 trace_array[0] = s_xorigbuff;
                  trace_array[1] = s_grep;
                  trace_array[2] = trace_tmp;
                  trace_array[3] = NULL;
@@ -570,11 +574,11 @@ tcache_finish(void)
                  mudstate.notrace = i_trace;
                  free_lbuf(trace_tmp);
               } else {
-                 edit_string(xp->orig, &tstr, &tstr2, s_grep, s_grep, 0, 0, 2, 1);
+                 edit_string(s_xorigbuff, &tstr, &tstr2, s_grep, s_grep, 0, 0, 2, 1);
                  free_lbuf(tstr);
               }
 #else
-              edit_string(xp->orig, &tstr, &tstr2, s_grep, s_grep, 0, 0, 2, 1);
+              edit_string(s_xorigbuff, &tstr, &tstr2, s_grep, s_grep, 0, 0, 2, 1);
               free_lbuf(tstr);
 #endif
            } else {
@@ -609,7 +613,7 @@ tcache_finish(void)
            }
            free_lbuf(s_aptext);
         }
-        if ( *(xp->label) ) {
+        if ( (xp->label) && *(xp->label) ) {
            if ( i_tabspace > 0 ) {
 	      notify(Owner(xp->player),
 	             safe_tprintf(tpr_buff, &tprp_buff, "%s(#%d) [%s%s%s]} %*s'%s' -> '%s'", Name(xp->player), xp->player,
@@ -666,9 +670,11 @@ tcache_finish(void)
 
 	free_lbuf(xp->orig);
 	free_lbuf(xp->result);
-        free_sbuf(xp->label);
-	free_sbuf(xp);
+        if ( xp->label )
+           free_sbuf(xp->label);
+	free_mbuf(xp);
     }
+    free_lbuf(s_xorigbuff);
     free_lbuf(tbuff);
     free_lbuf(tpr_buff);
     tcache_top = 1;
@@ -1282,7 +1288,7 @@ void parse_ansi(char *string, char *buff, char **bufptr, char *buff2, char **buf
 
 #endif
 
-char t_label[LABEL_MAX][SBUF_SIZE];
+char t_label[LABEL_MAX][SBUF_SIZE] = {{0}};
 int i_label[LABEL_MAX], i_label_lev = 0;
 
 void
@@ -1430,6 +1436,7 @@ mushexec(dbref player, dbref cause, dbref caller, int eval, char *dstr,
     /* If we are tracing, save a copy of the starting buffer */
 
     savestr = NULL;
+    s_label = NULL;
     if (is_trace) {
 	is_top = tcache_empty();
 	savestr = alloc_lbuf("exec.save");

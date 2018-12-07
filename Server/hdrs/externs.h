@@ -836,6 +836,7 @@ extern int      FDECL(mush_crypt_validate, (dbref, const char *, const char *, i
 #define NEWS_ARTICLELIFE  0x40000000
 
 #define HELP_SEARCH       0x00000040
+#define HELP_QUERY        0x00000080
 
 #define NEWSDB_DEFAULT	0x00000000
 #define NEWSDB_UNLOAD	0x00000001
@@ -969,6 +970,8 @@ extern int      FDECL(mush_crypt_validate, (dbref, const char *, const char *, i
 #define REC_AGE		8
 #define REC_DEST	16
 #define REC_FREE	32
+
+#define REALITY_RESET	1
 
 #define REBOOT_SILENT 	0x00000001	/* @reboot silently */
 #define REBOOT_PORT	0x00000002	/* What is @reboot/port ? */
@@ -1166,6 +1169,7 @@ extern int      FDECL(mush_crypt_validate, (dbref, const char *, const char *, i
 #define BLACKLIST_LIST	1	/* List blacklist */
 #define BLACKLIST_CLEAR	2	/* Clear blacklist */
 #define BLACKLIST_LOAD	4	/* Load blacklist.txt file */
+#define BLACKLIST_MASK	8	/* Load blacklist.txt file */
 
 #define WAIT_PID        1       /* Re-wait a PID process */
 #define WAIT_UNTIL	2	/* Wait until specified time */
@@ -1177,6 +1181,7 @@ extern int      FDECL(mush_crypt_validate, (dbref, const char *, const char *, i
 #define DYN_SEARCH	2	/* Issue a contextual search of help */
 #define DYN_NOLABEL	4	/* Remove the label from a normal help lookup -- should work with parse */
 #define DYN_SUGGEST	8	/* Allow suggestions in dynhelp -- multi-option */
+#define DYN_QUERY	16	/* Do a line by line 'comparison' of the code */
 
 #define EDIT_CHECK	1	/* Just check @edit, don't set */
 #define EDIT_SINGLE	2	/* Just do a single @edit, not multiple */

@@ -1312,9 +1312,9 @@ extern int FDECL(pstricmp, (char *, char *, int));
 extern RLEVEL FDECL(find_rlevel, (char *));
 #endif
 extern void local_function(char *, char *, char**, dbref, dbref, char **, int, char**, int);
-extern double mktime64(struct tm *);
-extern struct tm *gmtime64_r(const double *, struct tm *);
-extern struct tm *localtime64_r(const double *, struct tm *);
+extern double mush_mktime64(struct tm *);
+extern struct tm *mush_gmtime64_r(const double *, struct tm *);
+extern struct tm *mush_localtime64_r(const double *, struct tm *);
 extern int internal_logstatus(void);
 extern char * parse_ansi_name(dbref, char *);
 extern int count_extended(char *);
@@ -1640,12 +1640,12 @@ make_objid(dbref thing) {
                ttm = gmtime(&mudstate.now);
                mynow -= mktime(ttm);
             }
-            l_offset = (long) mktime(ttm) - (long) mktime64(ttm);
+            l_offset = (long) mktime(ttm) - (long) mush_mktime64(ttm);
             if (do_convtime(atext, ttm)) {
                if ( mudconf.objid_localtime ) {
-                  d_objid = (double)(mktime64(ttm) + l_offset);
+                  d_objid = (double)(mush_mktime64(ttm) + l_offset);
                } else {
-                  d_objid = (double)(mktime64(ttm) + l_offset + mynow + mudconf.objid_offset);
+                  d_objid = (double)(mush_mktime64(ttm) + l_offset + mynow + mudconf.objid_offset);
                }
                if ( i_id_found == 1 ) {
                   buff = alloc_sbuf("create_objid");
@@ -1750,22 +1750,29 @@ static int s_comp(const void *s1, const void *s2)
 }
 
 static const char *
-time_format_2(time_t dt)
+time_format_2(double dt)
 {
-    register struct tm *delta;
+    register struct tm *delta, *ttm;
     static char buf[64];
 
+    ttm = localtime(&mudstate.now);
 
     if (dt < 0)
         dt = 0;
 
-    delta = gmtime(&dt);
-    if ((int)dt >= 31556926 ) {
-        sprintf(buf, "%dy", (int)dt / 31556926);
-    } else if ((int)dt >= 2629743 ) {
-        sprintf(buf, "%dM", (int)dt / 2629743); 
-    } else if ((int)dt >= 604800) {
-        sprintf(buf, "%dw", (int)dt / 604800);
+    delta = mush_gmtime64_r(&dt, ttm);
+    if ((double)dt >= (double)31556926000000.0 ) {
+        sprintf(buf, "%.0fe", floor(dt / 31556926000000.0));
+    } else if ((double)dt >= (double)31556926000.0 ) {
+        sprintf(buf, "%.0fa", floor(dt / 31556926000.0));
+    } else if ((double)dt >= (double)3155692600.0 ) {
+        sprintf(buf, "%.0fC", floor(dt / 3155692600.0));
+    } else if ((double)dt >= (double)31556926.0 ) {
+        sprintf(buf, "%.0fy", floor(dt / 31556926.0));
+    } else if ((double)dt >= (double)2629743.0 ) {
+        sprintf(buf, "%.0fM", floor(dt / 2629743.0)); 
+    } else if ((double)dt >= (double)604800.0) {
+        sprintf(buf, "%.0fw", floor(dt / 604800.0));
     } else if (delta->tm_yday > 0) {
         sprintf(buf, "%dd", delta->tm_yday);
     } else if (delta->tm_hour > 0) {
@@ -2437,12 +2444,46 @@ do_reverse(char *from, char *to, char **tocx, int i_transpose)
     }
 }
 
+FUNCTION(fun_stderr)
+{
+  int i_tonotify;
+  char *t_buff, *t_buffptr;
+
+  if (!fn_range_check("STDERR", nfargs, 1, 2, buff, bufcx)) {
+    return;
+  }
+  
+  i_tonotify = 0;
+  if ( (nfargs > 1) && *fargs[1] ) {
+    i_tonotify = (atoi(fargs[1]) ? 1 : 0);
+  }
+  if ( !fargs[0] || !*fargs[0] ) {
+     return;
+  }
+
+  if ( (*fargs[0] == '#') &&
+       (*(fargs[0]+1) == '-') &&
+       (*(fargs[0]+2) == '1') ) {
+     if ( i_tonotify ) {
+        t_buffptr = t_buff = alloc_lbuf("fun_stderr");
+#ifdef ZENTY_ANSI
+        notify(player, safe_tprintf(t_buff, &t_buffptr, "%sSTDError:%s %s", SAFE_ANSI_HILITE, SAFE_ANSI_NORMAL, fargs[0]));
+#else
+        notify(player, safe_tprintf(t_buff, &t_buffptr, "%sSTDError:%s %s", ANSI_HILITE, ANSI_NORMAL, fargs[0]));
+#endif
+        free_lbuf(t_buff);
+     }
+     return;
+  }
+  safe_str(fargs[0], buff, bufcx);
+}
+
 FUNCTION(fun_singletime)
 {
-   int i_time;
+   double d_time;
 
-   i_time = atoi(fargs[0]);
-   safe_str((char *)time_format_2(i_time), buff, bufcx);
+   d_time = safe_atof(fargs[0]);
+   safe_str((char *)time_format_2(d_time), buff, bufcx);
 }
 
 FUNCTION(fun_safebuff)
@@ -7110,9 +7151,9 @@ FUNCTION(fun_moon)
       dd_now = (double)mudstate.now;
 
    ttm = localtime(&mudstate.now);
-   l_offset = (long) mktime(ttm) - (long) mktime64(ttm);
+   l_offset = (long) mktime(ttm) - (long) mush_mktime64(ttm);
    dd_now -= l_offset;
-   GMT = gmtime64_r(&dd_now, ttm);
+   GMT = mush_gmtime64_r(&dd_now, ttm);
    days = (GMT->tm_yday + 1.0) + ((GMT->tm_hour +
           (GMT->tm_min / 60.0) + (GMT->tm_sec / 3600.0)) / 24.0);
    for (cnt = EPOCH_MUSH; cnt < GMT->tm_year; ++cnt)
@@ -10806,9 +10847,9 @@ FUNCTION(fun_timefmt)
      }
   }
 
-  l_offset = (long) mktime(tms2) - (long) mktime64(tms2);
+  l_offset = (long) mktime(tms2) - (long) mush_mktime64(tms2);
   secs2 -= l_offset;
-  tms = gmtime64_r(&secs2, tms2); 
+  tms = mush_gmtime64_r(&secs2, tms2); 
   secs2 += l_offset;
   
   fmtbuff = alloc_mbuf("timefmt");
@@ -11083,7 +11124,7 @@ FUNCTION(fun_timefmt)
                 fmtdone = 1;
                 break;
               case 'z': /* is daylight savings */
-                tms3 = localtime64_r(&secs2, tms2);
+                tms3 = mush_localtime64_r(&secs2, tms2);
                 fm.lastval = tms3->tm_isdst;
                 sprintf(fmtbuff, "%d", fm.lastval);
                 showfield(fmtbuff, buff, bufcx, &fm, 1);
@@ -11469,9 +11510,9 @@ FUNCTION(fun_convsecs)
 
     tt2 = safe_atof(fargs[0]);
     ttm2 = localtime(&mudstate.now);
-    l_offset = (long) mktime(ttm2) - (long) mktime64(ttm2);
+    l_offset = (long) mktime(ttm2) - (long) mush_mktime64(ttm2);
     tt2 -= l_offset;
-    gmtime64_r(&tt2, ttm2);
+    mush_gmtime64_r(&tt2, ttm2);
     ttm2->tm_year += 1900;
     s_format = alloc_mbuf("convsecs");
     sprintf(s_format, "%s %s %2d %02d:%02d:%02d %d", s_wday[ttm2->tm_wday % 7], s_mon[ttm2->tm_mon % 12], 
@@ -11632,14 +11673,14 @@ FUNCTION(fun_convtime)
     char *outstr;
 
     ttm = localtime(&mudstate.now);
-    l_offset = (long) mktime(ttm) - (long) mktime64(ttm);
+    l_offset = (long) mktime(ttm) - (long) mush_mktime64(ttm);
     if (do_convtime(fargs[0], ttm)) {
-       fval(buff, bufcx, (double)(mktime64(ttm) + l_offset));
+       fval(buff, bufcx, (double)(mush_mktime64(ttm) + l_offset));
     } else if ( mudconf.enhanced_convtime ) {
        outstr = alloc_lbuf("fun_convtime_adv");
        do_date_conv(fargs[0], outstr);
        if (do_convtime(outstr, ttm)) {
-          fval(buff, bufcx, (double)(mktime64(ttm) + l_offset));
+          fval(buff, bufcx, (double)(mush_mktime64(ttm) + l_offset));
        } else {
           safe_str("-1", buff, bufcx);
        }
@@ -17136,11 +17177,15 @@ FUNCTION(fun_eval)
 /* Fun execscript for external script execution */
 FUNCTION(fun_execscript)
 {
-   FILE *fp;
-   char *s_combine, *s_inread, *s_inbuf, *s_inbufptr, *sptr, *sptr2;
-   int i_count, i_buff, i_power, i_level, i_alttimeout;
+   FILE *fp, *fp2;
+   char *s_combine, *s_inread, *s_inbuf, *s_inbufptr, *sptr, *sptr2, 
+        *s_vars, *s_varsbak, *s_varstok, *s_varstokptr, *s_varset, *s_vars2, *s_buff, *s_nregs,
+        *s_nregsptr, *s_varupper, *s_variable, *s_dbref, *s_string, *s_append, *s_appendptr, *s_inread2;
+   int i_count, i_buff, i_power, i_level, i_alttimeout, aflags, i_varset, i_id, i_noex, i_comments, i_flags[MAX_GLOBAL_REGS];
+   dbref aowner;
    time_t i_now;
    struct stat st_buf;
+   ATTR *attr;
    POWENT *pent;
 
 
@@ -17262,6 +17307,107 @@ FUNCTION(fun_execscript)
    free_lbuf(sptr2);
    setenv("MUSH_OWNERTOGGLES", s_combine, 1);
 
+   /* Set user defined environment variables */
+   attr = atr_str("EXECSCRIPT_VARS");
+   s_varsbak = NULL;
+   sptr2 = sptr = alloc_lbuf("execscript_attrs");
+   if ( attr && Good_chk(player) ) {
+      s_buff = alloc_lbuf("execscript_vars_buffer");
+      s_vars = atr_pget(player, attr->number, &aowner, &aflags);
+      if ( *s_vars ) {
+         s_varupper = s_vars;
+         while ( *s_varupper ) {
+            *s_varupper = ToUpper(*s_varupper);
+            s_varupper++;
+         }
+         s_varstok = strtok_r(s_vars, (char *)" ", &s_varstokptr);
+         s_varset = alloc_sbuf("execscript_variables");
+         i_count = 0;
+         while ( s_varstok && *s_varstok ) {
+            if ( ok_attr_name(s_varstok) ) {
+               if ( i_count ) {
+                  safe_chr(' ', sptr, &sptr2);
+               }
+               safe_str(s_varstok, sptr, &sptr2);
+               i_count=1;
+               attr = atr_str(s_varstok);
+               if ( attr ) {
+                  s_vars2 = atr_pget(player, attr->number, &aowner, &aflags);
+                  if ( *s_vars2 ) {
+                     sprintf(s_varset, "MUSHV_%.*s", (SBUF_SIZE-7), s_varstok);
+                     i_varset = setenv(s_varset, s_vars2, 1);
+                     if ( i_varset != 0 ) {
+                        sprintf(s_buff, "Warning: Unable to set environment variable %.*s", (LBUF_SIZE-100), s_varstok);
+                        notify_quiet(player, s_buff);
+                     }
+                  }
+                  free_lbuf(s_vars2);
+               }
+            } else {
+               sprintf(s_buff, "Warning: Skipping invalid attribute '%.*s'", (LBUF_SIZE-100), s_varstok);
+               notify_quiet(player, s_buff);
+            }
+            s_varstok = strtok_r(NULL, (char *)" ", &s_varstokptr);
+         }
+         setenv((char *)"MUSHL_VARS", sptr, 1);
+         s_varsbak = alloc_lbuf("svars_backup");
+         strcpy(s_varsbak, sptr);
+         free_sbuf(s_varset);
+      }
+      free_lbuf(s_buff);
+      free_lbuf(s_vars);
+   }
+   free_lbuf(sptr);
+   /* set setq register to environment variables */
+   s_varset = alloc_mbuf("execscript_variables2");
+   s_nregsptr = s_nregs = alloc_lbuf("execscript_regnames");
+   for ( i_count = 0; i_count < MAX_GLOBAL_REGS; i_count++) {
+      i_flags[i_count] = 0;
+      if ( *mudstate.global_regs[i_count] ) {
+         sprintf(s_varset, "MUSHQ_%c", ToUpper(mudstate.nameofqreg[i_count]));
+         i_varset = setenv(s_varset, mudstate.global_regs[i_count], 1);
+         if ( mudstate.global_regsname[i_count] && *(mudstate.global_regsname[i_count]) ) {
+            sprintf(s_varset, "MUSHN_%s", mudstate.global_regsname[i_count]);
+            s_buff = s_varset;
+            i_noex = 0;
+            while ( *s_buff ) {
+               if ( isspace(*s_buff) || !isascii(*s_buff) ) {
+                  i_noex = 1;
+                  break;
+               }
+               *s_buff = ToUpper(*s_buff);
+               s_buff++;
+            }
+            if ( i_noex ) {
+               sprintf(s_varset, "Warning: Unable to pass register name '%s' for register '%c'", 
+                        mudstate.global_regsname[i_count], ToUpper(mudstate.nameofqreg[i_count]));
+               notify_quiet(player, s_varset);
+            } else {
+               if ( *s_nregs ) {
+                  safe_chr(' ', s_nregs, &s_nregsptr);
+               }
+               i_flags[i_count] = 1;
+               safe_str(s_varset, s_nregs, &s_nregsptr);
+               i_varset = setenv(s_varset, mudstate.global_regs[i_count], 1);
+               sprintf(s_varset, "MUSHQN_%c", ToUpper(mudstate.nameofqreg[i_count]));
+               i_varset = setenv(s_varset, mudstate.global_regsname[i_count], 1);
+            }
+         }
+      }
+   } 
+   free_mbuf(s_varset);
+
+   i_noex = 0;
+   sprintf(s_combine, "./scripts/%.100s.set", fargs[0]);
+   if ( stat(s_combine, &st_buf) == 0 ) {
+      if ( unlink(s_combine) != 0 ) {
+         s_buff = alloc_lbuf("fun_execscript_errors");
+         sprintf(s_buff, "Warning: Unable to remove pre-existing script variable setter %.100s.  Will NOT execute.", s_combine);
+         notify_quiet(player, s_buff);
+         i_noex = 1;
+         free_lbuf(s_buff);
+      }
+   }
    if ( nfargs > 1 ) {
       s_inbufptr = s_inbuf = alloc_lbuf("fun_execscript_buffer");
       for ( i_count = 1; i_count < nfargs; i_count++ ) {
@@ -17320,7 +17466,7 @@ FUNCTION(fun_execscript)
          sptr = s_inread;
          /* convert to a '?' non-printable non-ascii-7 chars */
          while ( *sptr ) {
-            if ( !((isprint(*sptr) || isspace(*sptr)) && isascii(*sptr)) )
+            if ( !((isprint(*sptr) || (*sptr == BEEP_CHAR) || isspace(*sptr)) && isascii(*sptr)) )
                *sptr = '?';
             sptr++;
          }
@@ -17336,6 +17482,209 @@ FUNCTION(fun_execscript)
       sprintf(s_combine, "#-1 UNABLE TO EXECUTE '%s'", fargs[0]);
       safe_str(s_combine, buff, bufcx);
    }
+
+   /* We also set the variables in use -back- based on setq regs and contents of MUSHL_VARS */
+   s_varset = alloc_sbuf("execscript_variables2");
+   if ( !i_noex ) {
+      sprintf(s_combine, "./scripts/%.100s.set", fargs[0]);
+      s_buff = alloc_lbuf("fun_execscript_errors");
+      s_inread2 = alloc_lbuf("fun_execscript_read2");
+      s_appendptr = s_append = alloc_lbuf("fun_execscript_buffer");
+      i_comments = 0;
+      if ( (fp2 = fopen(s_combine, "r")) != NULL) {
+         s_inread = alloc_lbuf("fun_execscript_read2");
+         memset(s_inread, '\0', LBUF_SIZE);
+         i_count = 0;
+         while ( !feof(fp2) && (i_count <= 1000) ) {
+            i_count++;
+            fgets(s_inread, LBUF_SIZE-1, fp2);
+            if ( feof(fp2) ) {
+               break;
+            }
+            /* Ignore comments */
+            if ( *s_inread == '#' ) {
+               i_comments++;
+               continue;
+            }
+            sptr = s_inread;
+            /* convert to a '?' non-printable non-ascii-7 chars */
+            while ( *sptr ) {
+               if ( !((isprint(*sptr) || (*sptr == BEEP_CHAR) || isspace(*sptr)) && isascii(*sptr)) )
+                  *sptr = '?';
+               sptr++;
+            }
+            s_variable = s_inread;
+            s_inbuf = s_inread;
+            while ( *s_inbuf && !isspace(*s_inbuf) ) {
+               s_inbuf++;
+            }
+            if ( isspace(*s_inbuf) ) {
+               *s_inbuf = '\0';
+               s_inbuf++;
+               s_dbref = s_inbuf;
+            } else {
+               sprintf(s_buff, "Warning: Line %d of script variable setter %.100s is invalid. [null second arg]", i_count, s_combine);
+               notify_quiet(player, s_buff);
+               continue;
+            }
+            while ( *s_inbuf && !isspace(*s_inbuf) ) {
+               s_inbuf++;
+            }
+            if ( isspace(*s_inbuf) ) {
+               *s_inbuf = '\0';
+               s_inbuf++;
+               s_string = s_inbuf;
+               *(s_string+strlen(s_string)-1)='\0';
+               if ( *(s_string+strlen(s_string)-1) == LINEFEED_CHAR ) {
+                  memset(s_append, '\0', LBUF_SIZE);
+                  s_appendptr = s_append;
+                  while (  !feof(fp2) ) {
+                     *(s_string+strlen(s_string)-1)='\0';
+                     safe_str(s_string, s_append, &s_appendptr);
+                     safe_str((char *)"\r\n", s_append, &s_appendptr);
+                     fgets(s_inread2, LBUF_SIZE-1, fp2);
+                     if ( feof(fp2) ) {
+                        break;
+                     }
+                     sptr = s_inread2;
+                     while ( *sptr ) {
+                        if ( !((isprint(*sptr) || (*sptr == BEEP_CHAR) || isspace(*sptr)) && isascii(*sptr)) )
+                           *sptr = '?';
+                        sptr++;
+                     }
+                     s_string = s_inread2;
+                     *(s_string+strlen(s_string)-1)='\0';
+                     if ( feof(fp2) || *(s_string+strlen(s_string)-1) != LINEFEED_CHAR ) {
+                        *(s_string+strlen(s_string)-1)='\0';
+                        safe_str(s_string, s_append, &s_appendptr);
+                        safe_str((char *)"\r\n", s_append, &s_appendptr);
+                        break;
+                     }
+                  }
+                  s_string = s_append;
+               }
+            } else {
+               s_string = NULL;
+            }
+            if ( ((*s_dbref == 'q') || (*s_dbref == 'Q')) && 
+                 (!*(s_dbref+1) || (((*(s_dbref+1) == 'n') || (*(s_dbref+1) == 'N')) && !*(s_dbref+2))) ) {
+                  if ( (*(s_dbref+1) == 'n') || (*(s_dbref+1) == 'N' ) ) {
+                    for ( i_id = 0; i_id < MAX_GLOBAL_REGS; i_id++ ) {
+                       if ( *(mudstate.global_regsname[i_id]) && !stricmp(mudstate.global_regsname[i_id], s_variable) ) {
+                          if ( !s_string || !*s_string ) {
+                             *mudstate.global_regs[i_id]='\0';
+                          } else {
+                             sprintf(mudstate.global_regs[i_id], "%.*s", (LBUF_SIZE-10), s_string);
+                          }
+                          break;
+                       }
+                    }
+                  } else if ( (strlen(s_variable) == 1) && (index(mudstate.nameofqreg, ToLower(*s_variable)) != NULL) ) {
+                    for ( i_id = 0; i_id < MAX_GLOBAL_REGS; i_id++ ) {
+                       if ( ToLower(*s_variable) == mudstate.nameofqreg[i_id] ) {
+                          if ( !s_string || !*s_string ) {
+                             *mudstate.global_regs[i_id]='\0';
+                          } else {
+                             sprintf(mudstate.global_regs[i_id], "%.*s", (LBUF_SIZE-10), s_string);
+                          }
+                          break;
+                       } else {
+                          sprintf(s_buff, "Warning: Invalid setq register %c on line %d", *s_variable, i_count);
+                       }
+                    }
+                 } else {
+                    sprintf(s_buff, "Warning: Line %d of script variable setter %.100s is invalid. [invalid register %.100s]", 
+                            i_count, s_combine, s_variable);
+                    notify_quiet(player, s_buff);
+                 }
+                 continue;
+            } else if ( (*s_dbref != '#') || !isdigit(*(s_dbref+1)) ) {
+               sprintf(s_buff, "Warning: Line %d of script variable setter %.100s is invalid. [invalid dbref format %.100s]", 
+                       i_count, s_combine, (*s_dbref ? s_dbref : (char *)"-NULL-"));
+               notify_quiet(player, s_buff);
+               continue;
+            }
+            i_varset = atoi(s_dbref+1);
+            if ( !Good_chk(i_varset) || !controls(player, i_varset) ) {
+               sprintf(s_buff, "Warning: Invalid dbref #%d on line %d", i_varset, i_count);
+               notify_quiet(player, s_buff);
+               continue;
+            }
+            if ( !ok_attr_name(s_variable) ) {
+               sprintf(s_buff, "Warning: Invalid variable name '%s' on line %d", s_variable, i_count);
+               notify_quiet(player, s_buff);
+               continue;
+            }
+            if ( s_string && *s_string ) {
+               sprintf(s_buff, "%s:%.*s", s_variable, (LBUF_SIZE-100), s_string);
+            } else {
+               sprintf(s_buff, "%s:", s_variable);
+            }
+            do_set(player, cause, (SET_QUIET|SIDEEFFECT), s_dbref, s_buff);
+         }
+         free_lbuf(s_inread);
+         if ( unlink(s_combine) != 0 ) {
+            sprintf(s_buff, "Warning: Unable to remove script variable setter %.100s", s_combine);
+            notify_quiet(player, s_buff);
+         }
+         if ( i_count >= 1000 ) {
+            sprintf(s_buff, "Warning: variable setter %.100s contained more than 1000 lines.  Rest ignored.", s_combine);
+            notify_quiet(player, s_buff);
+         }
+         fclose(fp2);
+      }
+      if ( i_comments ) {
+         sprintf(s_buff, "Notice: %d total comments ignored from variable setter %.100s", i_comments, s_combine);
+         notify_quiet(player, s_buff);
+      }
+      free_lbuf(s_append);
+      free_lbuf(s_buff);
+      free_lbuf(s_inread2);
+   }
+   /* Cleanup registers */
+   for ( i_count = 0; i_count < MAX_GLOBAL_REGS; i_count++) {
+      sprintf(s_varset, "MUSHQ_%c", ToUpper(mudstate.nameofqreg[i_count]));
+      unsetenv(s_varset);
+      if ( i_flags[i_count] ) {
+         sprintf(s_varset, "MUSHQN_%c", ToUpper(mudstate.nameofqreg[i_count]));
+         unsetenv(s_varset);
+      }
+   }
+   /* Cleanup register names */
+   if ( *s_nregs ) {
+      s_buff = strtok_r(s_nregs, (char *)" ", &s_nregsptr);
+      while ( s_buff && *s_buff ) {
+         unsetenv(s_buff);
+         s_buff = strtok_r(NULL, (char *)" ", &s_nregsptr);
+      }
+   }
+   /* Cleanup on isle 2 -- cleanup variables we set */
+   if ( s_varsbak ) {
+      s_varstok = strtok_r(s_varsbak, (char *)" ", &s_varstokptr);
+      while ( s_varstok && *s_varstok ) {
+         s_varupper = s_varstok;
+         while ( *s_varupper ) {
+            *s_varupper = ToUpper(*s_varupper);
+            s_varupper++;
+         }
+         sprintf(s_varset, "MUSHV_%.*s", (SBUF_SIZE-7), s_varstok);
+         unsetenv(s_varset);
+         s_varstok = strtok_r(NULL, (char *)" ", &s_varstokptr);
+      }
+      free_lbuf(s_varsbak);
+   }
+   unsetenv("MUSHL_VARS");
+   unsetenv("MUSH_PLAYER");
+   unsetenv("MUSH_CAUSE");
+   unsetenv("MUSH_CALLER");
+   unsetenv("MUSH_OWNER");
+   unsetenv("MUSH_FLAGS");
+   unsetenv("MUSH_OWNERFLAGS");
+   unsetenv("MUSH_TOGGLES");
+   unsetenv("MUSH_OWNERTOGGLES");
+
+   free_lbuf(s_nregs);
+   free_sbuf(s_varset);
    free_lbuf(s_combine);
 }
 
@@ -18549,7 +18898,7 @@ FUNCTION(fun_randextract)
 {
   int *used, nword, numext, got, pos, x, y, z, end, i_sum, i_max, i_loop,
       ilist[LBUF_SIZE / 2], ilist2[LBUF_SIZE / 2], i_slist, i_nlist, i_weight, i_usable;
-  char *p1, *p2, sep, te, *b2, osep, *tbuff, *tbuff2, *tbuffptr, 
+  char *p1, *p2, sep, te, *b2, osep, *tbuff, *tbuff2,
        *slist[LBUF_SIZE / 2], *nlist[LBUF_SIZE / 2], *s_use;
 
   if (!fn_range_check("RANDEXTRACT", nfargs, 1, 6, buff, bufcx)) {
@@ -18607,7 +18956,6 @@ FUNCTION(fun_randextract)
         i_sum = random() % i_max;
      }
      memset(tbuff, '\0', LBUF_SIZE);
-     tbuffptr = tbuff;
      for ( i_loop = 0; i_loop < i_slist; i_loop++ ) {
         if ( ilist[i_loop] >= i_sum ) {
            ilist2[i_usable] = i_loop;
@@ -19225,12 +19573,12 @@ FUNCTION(fun_objid) {
                ttm = gmtime(&mudstate.now);
                mynow -= mktime(ttm);
             }
-            l_offset = (long) mktime(ttm) - (long) mktime64(ttm);
+            l_offset = (long) mktime(ttm) - (long) mush_mktime64(ttm);
             if (do_convtime(atext, ttm)) {
                if ( mudconf.objid_localtime ) {
-                  d_objid = (double)(mktime64(ttm) + l_offset);
+                  d_objid = (double)(mush_mktime64(ttm) + l_offset);
                } else {
-                  d_objid = (double)(mktime64(ttm) + l_offset + mynow + mudconf.objid_offset);
+                  d_objid = (double)(mush_mktime64(ttm) + l_offset + mynow + mudconf.objid_offset);
                }
                if ( i_id_found == 1 ) {
                   tbuff = alloc_sbuf("create_objid");
@@ -23946,7 +24294,12 @@ FUNCTION(fun_caplist)
   	              safe_chr( ToUpper( *ap ), buff, bufcx );
                       i_cap = 1;
                    } else {
-                      if ( i_hyphen && (*(ap-1) == '-') ) {
+                      if ( ((i_hyphen & 1  ) && (*(ap-1) == '-' )) || 
+                           ((i_hyphen & 2  ) && (*(ap-1) == '(' )) || 
+                           ((i_hyphen & 4  ) && (*(ap-1) == '[' )) ||
+                           ((i_hyphen & 8  ) && (*(ap-1) == '{' )) ||
+                           ((i_hyphen & 16 ) && (*(ap-1) == '"' )) ||
+                           ((i_hyphen & 32 ) && (*(ap-1) == '\'')) ) {
   	                 safe_chr( ToUpper( *ap ), buff, bufcx );
                       } else {
   	                 safe_chr( ToLower( *ap ), buff, bufcx );
@@ -24045,7 +24398,12 @@ FUNCTION(fun_caplist)
                    }
                    i_cap = i_hcap = 1;
                 } else {
-                   if ( i_hyphen && (*(ap-1) == '-') ) {
+                   if ( ((i_hyphen & 1  ) && (*(ap-1) == '-' )) || 
+                        ((i_hyphen & 2  ) && (*(ap-1) == '(' )) || 
+                        ((i_hyphen & 4  ) && (*(ap-1) == '[' )) ||
+                        ((i_hyphen & 8  ) && (*(ap-1) == '{' )) ||
+                        ((i_hyphen & 16 ) && (*(ap-1) == '"' )) ||
+                        ((i_hyphen & 32 ) && (*(ap-1) == '\'')) ) {
                       safe_chr( ToUpper( *ap ), buff, bufcx );
                    } else {
 	              safe_chr( ToLower( *ap ), buff, bufcx );
@@ -24505,7 +24863,7 @@ parse_lattr(char *buff, char **bufcx, dbref player, dbref cause, dbref caller,
                s_storname[2] = alloc_sbuf("lattr_storname");
             }
             for (ca = olist_first(&master); ca != NOTHING; ca = olist_next(&master)) {
-                attr = atr_num(ca);
+                attr = atr_num_lattr(ca);
                 if (attr) {
                     if ( (c_lookup == '>') || (c_lookup == '<') ) {
                        if ( *s_storname[0] ) {
@@ -24569,7 +24927,7 @@ parse_lattr(char *buff, char **bufcx, dbref player, dbref cause, dbref caller,
                     }
                     if (chk_cmd > 0) {
                        atr_get_str(s_shoveattr, thing, attr->number, &aowner, &aflags);
-                       if ( s_shoveattr[0] == c_lookup ) {
+                       if ( (s_shoveattr[0] == c_lookup) && (strchr(s_shoveattr, ':') != NULL) ) {
                           if (!first)
                               safe_chr(' ', buff, bufcx);
                           first = 0;
@@ -25790,7 +26148,7 @@ FUNCTION(fun_nsiter)
 FUNCTION(fun_strmath)
 {
    char *curr, *cp, *objstring, sep, osep, *tcurr, *tmp,
-        *s_str, *s_strtok, sep2, osep2, osep_str[3];
+        *s_str, *s_strtok, sep2, osep2, osep_str[3], *myfargs2;
    static char mybuff[LBUF_SIZE];
    int  first, first2, i_start, i_cnt, i_currcnt, i_applycnt, 
         i_mintog, i_maxtog;
@@ -25903,6 +26261,9 @@ FUNCTION(fun_strmath)
       f_base = 0.0;
    else
       f_base = safe_atof(tcurr);
+
+   myfargs2 = exec(player, cause, caller, EV_STRIP | EV_FCHECK | EV_EVAL, fargs[2],
+                    cargs, ncargs, (char **)NULL, 0);
    free_lbuf(tcurr);
    first = 1;
    i_currcnt = 1;
@@ -25928,7 +26289,7 @@ FUNCTION(fun_strmath)
             if ( (!i_mintog || (i_mintog && (f_number >= f_min))) &&
                  (!i_maxtog || (i_maxtog && (f_number <= f_max))) ) {
                if ( (i_currcnt >= i_start) && (i_applycnt <= i_cnt) ) {
-                  switch( *fargs[2] ) {
+                  switch( *myfargs2 ) {
                      case '+': f_val = f_number + f_base;
                                break;
                      case '-': f_val = f_number - f_base;
@@ -25946,42 +26307,42 @@ FUNCTION(fun_strmath)
                                f_val = fmod(f_number, f_base);
                                break;
                      case '<': f_val = f_number;
-                               if ( *(fargs[2]+1) == '=') {
-                                  if ( f_number <= safe_atof(fargs[2]+2) ) {
+                               if ( *(myfargs2+1) == '=') {
+                                  if ( f_number <= safe_atof(myfargs2+2) ) {
                                      f_val = f_base;
                                   }
-                               } else if ( f_number < safe_atof(fargs[2]+1) ) {
+                               } else if ( f_number < safe_atof(myfargs2+1) ) {
                                   f_val = f_base;
                                }
                                break;
                      case '>': f_val = f_number;
-                               if ( *(fargs[2]+1) == '=') {
-                                  if ( f_number >= safe_atof(fargs[2]+2) ) {
+                               if ( *(myfargs2+1) == '=') {
+                                  if ( f_number >= safe_atof(myfargs2+2) ) {
                                      f_val = f_base;
                                   }
-                               } else if ( f_number > safe_atof(fargs[2]+1) ) {
+                               } else if ( f_number > safe_atof(myfargs2+1) ) {
                                   f_val = f_base;
                                }
                                break;
                      case '!': f_val = f_number;
-                               if ( (*(fargs[2]+1) == '=') && (f_number != safe_atof(fargs[2]+2)) ) {
+                               if ( (*(myfargs2+1) == '=') && (f_number != safe_atof(myfargs2+2)) ) {
                                   f_val = f_base;
                                }
                                break;
                      case '=': f_val = f_number;
-                               if ( *(fargs[2]+1) == '>') {
-                                  if (f_number >= safe_atof(fargs[2]+2) ) {
+                               if ( *(myfargs2+1) == '>') {
+                                  if (f_number >= safe_atof(myfargs2+2) ) {
                                      f_val = f_base;
                                   }
-                               } else if ( *(fargs[2]+1) == '<') {
-                                  if (f_number <= safe_atof(fargs[2]+2) ) {
+                               } else if ( *(myfargs2+1) == '<') {
+                                  if (f_number <= safe_atof(myfargs2+2) ) {
                                      f_val = f_base;
                                   }
-                               } else if ( *(fargs[2]+1) == '!') {
-                                  if (f_number != safe_atof(fargs[2]+2) ) {
+                               } else if ( *(myfargs2+1) == '!') {
+                                  if (f_number != safe_atof(myfargs2+2) ) {
                                      f_val = f_base;
                                   }
-                               } else if ( f_number == safe_atof(fargs[2]+1) ) {
+                               } else if ( f_number == safe_atof(myfargs2+1) ) {
                                   f_val = f_base;
                                }
                                break;
@@ -26006,6 +26367,7 @@ FUNCTION(fun_strmath)
       i_currcnt++;
       first = 0;
    }
+   free_lbuf(myfargs2);
    free_lbuf(curr);
 }
 
@@ -27177,6 +27539,10 @@ FUNCTION(fun_lavg)
     int cntr;
     char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
     varargs_preamble("LAVG", 2);
 
     sum = 0;
@@ -27197,6 +27563,10 @@ FUNCTION(fun_ladd)
     double sum;
     char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
     varargs_preamble("LADD", 2);
 
     sum = 0;
@@ -27213,6 +27583,10 @@ FUNCTION(fun_lsub)
    double sum;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LSUB", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27234,6 +27608,10 @@ FUNCTION(fun_lmul)
    double sum;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LMUL", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27255,6 +27633,10 @@ FUNCTION(fun_ldiv)
    double sum, chksum;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LDIV", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27278,6 +27660,10 @@ FUNCTION(fun_lor)
    int i;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LOR", 2);
 
    i = 0;
@@ -27294,6 +27680,10 @@ FUNCTION(fun_land)
    int i;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LAND", 2);
 
    i = 1;
@@ -27310,6 +27700,10 @@ FUNCTION(fun_lxor)
    int val, i_val, cntr;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LXOR", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27333,6 +27727,10 @@ FUNCTION(fun_lnor)
    int val, i_val, cntr;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LNOR", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27356,6 +27754,10 @@ FUNCTION(fun_lxnor)
    int val, i_val, cntr;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LXNOR", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27379,6 +27781,10 @@ FUNCTION(fun_lmax)
    double max, val;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LMAX", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -27400,6 +27806,10 @@ FUNCTION(fun_lmin)
    double min, val;
    char *cp, *curr, sep;
 
+    if ( nfargs == 0 ) {
+       ival(buff, bufcx, 0);
+       return;
+    }
    varargs_preamble("LMIN", 2);
 
    cp = trim_space_sep(fargs[0], sep);
@@ -33683,12 +34093,14 @@ FUNCTION(fun_oemit)
       return;
    }
 
-   if (!fn_range_check("OEMIT", nfargs, 2, 3, buff, bufcx))
+   if (!fn_range_check("OEMIT", nfargs, 2, 3, buff, bufcx)) {
       return;
+   }
 
    i_key = 0;
-   if ( (nfargs > 2) && fargs[2] && *fargs[2] )
+   if ( (nfargs > 2) && fargs[2] && *fargs[2] ) {
       i_key = atoi(fargs[2]);
+   }
       
    mudstate.sidefx_currcalls++;
    cmdp = (CMDENT *)hashfind((char *)"@oemit", &mudstate.command_htab);
@@ -33706,20 +34118,22 @@ FUNCTION(fun_oemit)
 FUNCTION(fun_pemit)
 {
    CMDENT *cmdp;
-   int i_key;
+   int i_key, i_mask;
 
    if ( !(mudconf.sideeffects & SIDE_PEMIT) ) {
       notify(player, "#-1 FUNCTION DISABLED");
       return;
    }
 
-   if (!fn_range_check("PEMIT", nfargs, 2, 3, buff, bufcx))
-      return;
-
    if ( !SideFX(player) || Fubar(player) || return_bit(player) < mudconf.restrict_sidefx ) {
       notify(player, "Permission denied.");
       return;
    }
+
+   if (!fn_range_check("PEMIT", nfargs, 2, 3, buff, bufcx)) {
+      return;
+   }
+
    mudstate.sidefx_currcalls++;
    cmdp = (CMDENT *)hashfind((char *)"@pemit", &mudstate.command_htab);
    if ( !check_access(player, cmdp->perms, cmdp->perms2, 0) || cmdtest(player, "@pemit") ||
@@ -33731,20 +34145,21 @@ FUNCTION(fun_pemit)
    if ( nfargs > 2 && *fargs[2] ) {
       i_key = atoi(fargs[2]);
    }
-   if (i_key == 1 ) {
-      do_pemit( player, cause, (SIDEEFFECT|PEMIT_PEMIT|PEMIT_LIST), fargs[0], fargs[1], cargs, ncargs);
-   } else {
-      do_pemit( player, cause, (SIDEEFFECT|PEMIT_PEMIT|PEMIT_LIST|PEMIT_NOSUB), fargs[0], fargs[1], cargs, ncargs);
+   i_mask = PEMIT_NOSUB;
+   switch (i_key) {
+      case 1: i_mask &= ~PEMIT_NOSUB;
+              break;
+      case 2: i_mask |= PEMIT_ONEEVAL;
+              break;
    }
+   do_pemit( player, cause, (SIDEEFFECT|PEMIT_PEMIT|PEMIT_LIST|i_mask), fargs[0], fargs[1], cargs, ncargs);
 }
 
 FUNCTION(fun_remit)
 {
    CMDENT *cmdp;
-   int i_type;
+   int i_type, i_key, i_mask;
 
-   if (!fn_range_check("REMIT", nfargs, 2, 3, buff, bufcx))
-      return;
    if ( !(mudconf.sideeffects & SIDE_REMIT) ) {
       notify(player, "#-1 FUNCTION DISABLED");
       return;
@@ -33753,6 +34168,11 @@ FUNCTION(fun_remit)
       notify(player, "Permission denied.");
       return;
    }
+
+   if (!fn_range_check("REMIT", nfargs, 2, 4, buff, bufcx)) {
+      return;
+   }
+
    mudstate.sidefx_currcalls++;
    cmdp = (CMDENT *)hashfind((char *)"@pemit", &mudstate.command_htab);
    if ( !check_access(player, cmdp->perms, cmdp->perms2, 0) || cmdtest(player, "@pemit") ||
@@ -33761,17 +34181,30 @@ FUNCTION(fun_remit)
       return;
    }
    i_type = 0;
-   if ( (nfargs > 2) && *fargs[2] && *fargs[0] && (strchr(fargs[0], '/') != NULL) )
+   if ( (nfargs > 2) && *fargs[2] && *fargs[0] && (strchr(fargs[0], '/') != NULL) ) {
       i_type = atoi(fargs[2]);
-   if ( i_type )
-      do_pemit( player, cause, (SIDEEFFECT|PEMIT_CONTENTS|PEMIT_LIST|PEMIT_PEMIT|PEMIT_REALITY|PEMIT_TOREALITY), fargs[0], fargs[1], cargs, ncargs);
-   else
-      do_pemit( player, cause, (SIDEEFFECT|PEMIT_CONTENTS|PEMIT_LIST|PEMIT_PEMIT), fargs[0], fargs[1], cargs, ncargs);
+   }
+   i_mask = i_key = 0;
+   if ( (nfargs > 3) && *fargs[3] ) {
+      i_key = atoi(fargs[3]);
+   }
+   switch (i_key) {
+      case 1: i_mask |= PEMIT_NOSUB;
+              break;
+      case 2: i_mask |= (PEMIT_NOSUB|PEMIT_ONEEVAL);
+              break;
+   }
+   if ( i_type ) {
+      do_pemit( player, cause, (SIDEEFFECT|PEMIT_CONTENTS|PEMIT_LIST|PEMIT_PEMIT|PEMIT_REALITY|PEMIT_TOREALITY|i_mask), fargs[0], fargs[1], cargs, ncargs);
+   } else {
+      do_pemit( player, cause, (SIDEEFFECT|PEMIT_CONTENTS|PEMIT_LIST|PEMIT_PEMIT|i_mask), fargs[0], fargs[1], cargs, ncargs);
+   }
 }
 
 FUNCTION(fun_zemit)
 {
    CMDENT *cmdp;
+   int i_key, i_mask;
 
    if ( !(mudconf.sideeffects & SIDE_ZEMIT) ) {
       notify(player, "#-1 FUNCTION DISABLED");
@@ -33781,6 +34214,11 @@ FUNCTION(fun_zemit)
       notify(player, "Permission denied.");
       return;
    }
+
+   if (!fn_range_check("ZEMIT", nfargs, 2, 3, buff, bufcx)) {
+      return;
+   }
+   
    mudstate.sidefx_currcalls++;
    cmdp = (CMDENT *)hashfind((char *)"@pemit", &mudstate.command_htab);
    if ( !check_access(player, cmdp->perms, cmdp->perms2, 0) || cmdtest(player, "@pemit") ||
@@ -33788,7 +34226,19 @@ FUNCTION(fun_zemit)
       notify(player, "Permission denied.");
       return;
    }
-   do_pemit( player, cause, (SIDEEFFECT|PEMIT_ZONE|PEMIT_LIST|PEMIT_PEMIT), fargs[0], fargs[1], cargs, ncargs);
+   
+   i_key = i_mask = 0;
+   if ( (nfargs > 2) && *fargs[2] ) {
+      i_key = atoi(fargs[2]);
+   }
+   switch (i_key) {
+      case 1: i_mask |= PEMIT_NOSUB;
+              break;
+      case 2: i_mask |= (PEMIT_NOSUB|PEMIT_ONEEVAL);
+              break;
+   }
+
+   do_pemit( player, cause, (SIDEEFFECT|PEMIT_ZONE|PEMIT_LIST|PEMIT_PEMIT|i_mask), fargs[0], fargs[1], cargs, ncargs);
 }
 
 FUNCTION(fun_tel)
@@ -35678,6 +36128,7 @@ FUN flist[] =
     {"STARTTIME", fun_starttime, 0, 0, CA_PUBLIC, CA_NO_CODE},
     {"STARTSECS", fun_startsecs, 0, 0, CA_PUBLIC, CA_NO_CODE},
     {"STATS", fun_stats, 1, 0, CA_PUBLIC, CA_NO_CODE},
+    {"STDERR", fun_stderr, 1, FN_VARARGS, CA_PUBLIC, CA_NO_CODE},
     {"STEP", fun_step, 0, FN_VARARGS, CA_PUBLIC, CA_NO_CODE},
     {"STR", fun_str, 2, 0, CA_PUBLIC, 0},
     {"STRDISTANCE", fun_strdistance, 2, FN_VARARGS, CA_PUBLIC, CA_NO_CODE},
@@ -35804,9 +36255,9 @@ FUN flist[] =
     {"XORFLAG", fun_xorflag, 0, FN_VARARGS, CA_PUBLIC, CA_NO_CODE},
 #ifdef USE_SIDEEFFECT
 #ifdef SECURE_SIDEEFFECT
-    {"ZEMIT", fun_zemit, 2, FN_NO_EVAL, CA_PUBLIC, CA_NO_CODE},
+    {"ZEMIT", fun_zemit, 2, FN_NO_EVAL | FN_VARARGS, CA_PUBLIC, CA_NO_CODE},
 #else
-    {"ZEMIT", fun_zemit, 2, 0, CA_PUBLIC, CA_NO_CODE},
+    {"ZEMIT", fun_zemit, 2, FN_VARARGS, CA_PUBLIC, CA_NO_CODE},
 #endif
 #endif
 #ifdef TINY_U

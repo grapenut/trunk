@@ -54,7 +54,7 @@ if [ -f /sbin/ldconfig ]
 then
    LDCONFIG="/sbin/ldconfig"
 else
-   for i in $(slocate ldconfig)
+   for i in $(slocate ldconfig 2>/dev/null)
    do
       if [ $(file "$i"|grep -c ELF) -gt 0 ]
       then
@@ -69,7 +69,7 @@ elif [ -f /usr/bin/gcc ]
 then
    MYGCC=/usr/bin/gcc
 else
-   for i in $(slocate gcc)
+   for i in $(slocate gcc 2>/dev/null)
    do
       if [ $(file "$i"|grep -c ELF) -gt 0 ]
       then
@@ -1388,6 +1388,16 @@ saveopts() {
    fi
 }
 
+###################################################################
+# LOADTEMPLATE - Load the template for default compiles
+###################################################################
+loadtemplate() {
+   if [ -f asksource.save_template ]
+   then
+      . ./asksource.save_template 2>/dev/null
+   fi
+}
+###################################################################
 
 ###################################################################
 # LOADLASTSTATE - Load the last state
@@ -1995,6 +2005,11 @@ updatemakefile() {
 # MAIN - Main system call and loop
 ###################################################################
 main() {
+   if [ "$1" = "default" ]
+   then
+      loadtemplate
+      REPEAT=0
+   fi
    loadlaststate
    while [ ${REPEAT} -eq 1 ]
    do
@@ -2063,11 +2078,14 @@ main() {
    setlibs
    updatemakefile
    savelaststate
-   echo "< HIT RETURN KEY TO CONTINUE >"
-   read ANS
+   if [ "$1" != "default" ]
+   then
+      echo "< HIT RETURN KEY TO CONTINUE >"
+      read ANS
+   fi
 }
 
 ###################################################################
 # Ok, let's run it
 ###################################################################
-main
+main "$1"

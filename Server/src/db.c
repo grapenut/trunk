@@ -35,7 +35,7 @@ int malloc_count = 0;
 
 #endif /* TEST_MALLOC */
 
-extern double mktime64(struct tm *);
+extern double mush_mktime64(struct tm *);
 extern double safe_atof(char *);
 extern int FDECL(do_convtime, (char *, struct tm *));
 
@@ -2057,6 +2057,35 @@ atr_num2(int anum)
 }
 
 ATTR *
+atr_num_lattr(int anum)
+{
+    VATTR *va;
+    static ATTR tattr;
+
+    /* Look for a predefined attribute */
+
+    if (anum < A_USER_START)
+	return anum_get(anum);
+
+    if (anum > anum_alc_top)
+	return NULL;
+
+    /* It's a user-defined attribute, we need to copy data */
+
+    va = (VATTR *) anum_get(anum);
+    if (va != NULL) {
+	tattr.name = va->name;
+	tattr.number = va->number;
+	tattr.flags = va->flags;
+	tattr.check = NULL;
+	return &tattr;
+    }
+    /* All failed, return NULL */
+
+    return NULL;
+}
+
+ATTR *
 atr_num(int anum)
 {
     VATTR *va;
@@ -3792,12 +3821,12 @@ parse_dbref_special(char *s) {
                ttm = gmtime(&mudstate.now);
                mynow -= mktime(ttm);
             }
-            l_offset = (long) mktime(ttm) - (long) mktime64(ttm);
+            l_offset = (long) mktime(ttm) - (long) mush_mktime64(ttm);
             if (do_convtime(atext, ttm)) {
                if ( mudconf.objid_localtime ) {
-                  y = (double)(mktime64(ttm) + l_offset);
+                  y = (double)(mush_mktime64(ttm) + l_offset);
                } else {
-                  y = (double)(mktime64(ttm) + l_offset + mynow + mudconf.objid_offset);
+                  y = (double)(mush_mktime64(ttm) + l_offset + mynow + mudconf.objid_offset);
                }
                if ( i_id_found == 1 ) {
                   buff = alloc_sbuf("create_objid");

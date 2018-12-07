@@ -139,7 +139,7 @@ init_vars() {
              txt/plushelp.txt"
    IMPORTANTFILES="alias.conf muxalias.conf rhost_ingame.conf \
                    alternate_netrhost.conf netrhost.conf rhost_mysql.conf \
-                   compat.conf pennalias.conf tm3alias.conf"
+                   compat.conf pennalias.conf tm3alias.conf data/netrhost.SIGHUP.flat"
 #  SQLFILES="sqlite/*"
 }
 #############################################################################
@@ -227,6 +227,7 @@ do_full_backup() {
          tar -cvf $OLDFLAT/"${MAILNEWSDB}".dbflat1.tar ./data/"${MAINDBNAME}".db.flat \
                   ./data/"${MAILNEWSDB}".news.flat ./data/"${MAILNEWSDB}".dump.mail \
                   ./data/"${MAILNEWSDB}".areg.dump  ./data/"${MAILNEWSDB}".dump.folder \
+                  ./data/netrhost.SIGHUP.flat \
                   ${TXTFILES} ${IMPORTANTFILES} ${SQLFILES} 2>/dev/null 1>&2
          ${COMPREXE} -f ${OLDFLAT}/"${MAILNEWSDB}".dbflat1.tar
          if [ "${DOARCH}" = "yes" ]
@@ -236,6 +237,7 @@ do_full_backup() {
             mv -f ./data/"${MAILNEWSDB}".dump.mail ${PREVFLAT} 2>/dev/null
             mv -f ./data/"${MAILNEWSDB}".dump.folder ${PREVFLAT} 2>/dev/null
             mv -f ./data/"${MAILNEWSDB}".areg.dump ${PREVFLAT} 2>/dev/null
+            mv -f ./data/netrhost.SIGHUP.flat ${PREVFLAT} 2> /dev/null
          fi
 }
 #############################################################################
